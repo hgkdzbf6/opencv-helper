@@ -7,7 +7,7 @@ interface ProcessNodeProps {
   id: string;
   data: {
     id: string;
-    type: 'binary' | 'blur';
+    type: 'binary' | 'blur' | 'erode' | 'dilate' | 'edge' | 'mask' | 'invert-mask' | 'draw-rect' | 'draw-circle' | 'draw-line';
     label: string;
   };
   className?: string;
@@ -25,10 +25,22 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   // 初始化节点参数
   useEffect(() => {
     if (!nodeParams) {
-      const defaultParams = data.type === 'binary' 
-        ? { binary: { threshold: 128 } }
-        : { blur: { kernelSize: 5 } };
-      setNodeParams(data.id, defaultParams);
+      const defaultParams = {
+        binary: { threshold: 128 },
+        blur: { kernelSize: 5 },
+        erode: { kernelSize: 3 },
+        dilate: { kernelSize: 3 },
+        edge: { threshold1: 100, threshold2: 200 },
+        mask: { threshold: 128 },
+        'invert-mask': { threshold: 128 },
+        'draw-rect': { x: 0, y: 0, width: 100, height: 100, color: [255, 0, 0] },
+        'draw-circle': { x: 50, y: 50, radius: 25, color: [0, 255, 0] },
+        'draw-line': { x1: 0, y1: 0, x2: 100, y2: 100, color: [0, 0, 255] }
+      }[data.type];
+      
+      if (defaultParams) {
+        setNodeParams(data.id, { [data.type]: defaultParams });
+      }
     }
   }, [data.id, data.type, nodeParams, setNodeParams]);
 
@@ -41,10 +53,7 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
       }
 
       try {
-        const params = data.type === 'binary'
-          ? { threshold: nodeParams.binary?.threshold || 128 }
-          : { kernelSize: nodeParams.blur?.kernelSize || 5 };
-
+        const params = nodeParams[data.type] || {};
         const processed = await processImage(inputImage, data.type, params);
         setImage(data.id, processed);
       } catch (error) {

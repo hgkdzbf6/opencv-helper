@@ -1,12 +1,37 @@
 import { create } from 'zustand';
 import { Edge } from 'reactflow';
 
-interface NodeParams {
-  binary?: {
-    threshold: number;
-  };
-  blur?: {
-    kernelSize: number;
+export interface NodeParams {
+  [key: string]: {
+    threshold?: number;
+    maxValue?: number;
+    method?: string;
+    useOtsu?: boolean;
+    kernelSize?: number;
+    sigmaX?: number;
+    sigmaY?: number;
+    borderType?: string;
+    iterations?: number;
+    kernelShape?: string;
+    anchor?: { x: number; y: number };
+    threshold1?: number;
+    threshold2?: number;
+    apertureSize?: string;
+    l2gradient?: boolean;
+    blendAlpha?: number;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    radius?: number;
+    color?: [number, number, number];
+    thickness?: number;
+    lineType?: string;
+    filled?: boolean;
+    x1?: number;
+    y1?: number;
+    x2?: number;
+    y2?: number;
   };
 }
 
@@ -16,10 +41,9 @@ interface ImageState {
   showNodesPreview: boolean;
   nodeParams: Record<string, NodeParams>;
   setImage: (nodeId: string, imageData: string) => void;
-  getImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
+  getImage: (nodeId: string) => string | undefined;
   setEdges: (edges: Edge[]) => void;
-  getConnectedNodeImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
-  getSourceNode: (nodeId: string) => string | undefined;
+  getConnectedNodeImage: (nodeId: string) => string | undefined;
   toggleNodesPreview: () => void;
   setNodeParams: (nodeId: string, params: NodeParams) => void;
   getNodeParams: (nodeId: string) => NodeParams | undefined;
@@ -41,17 +65,11 @@ export const useImageStore = create<ImageState>((set, get) => ({
   },
 
   getImage: (nodeId: string) => {
-    const state = get();
-    return state.images[nodeId];
+    return get().images[nodeId];
   },
 
   setEdges: (edges: Edge[]) => {
     set({ edges });
-  },
-
-  getSourceNode: (nodeId: string) => {
-    const edge = get().edges.find(edge => edge.target === nodeId);
-    return edge?.source;
   },
 
   getConnectedNodeImage: (nodeId: string) => {

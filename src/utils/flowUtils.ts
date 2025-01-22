@@ -8,14 +8,31 @@ interface FlowData {
   nodeParams: Record<string, any>;
 }
 
-export const saveFlow = (nodes: Node[], edges: Edge[]) => {
+export type SaveOption = 'all' | 'input-only' | 'none';
+
+export const saveFlow = (nodes: Node[], edges: Edge[], saveOption: SaveOption = 'all') => {
   const store = useImageStore.getState();
   const flowData: FlowData = {
     nodes,
     edges,
-    images: store.images,
+    images: {},
     nodeParams: store.nodeParams,
   };
+
+  // 根据保存选项处理图片
+  if (saveOption === 'all') {
+    flowData.images = store.images;
+  } else if (saveOption === 'input-only') {
+    // 只保存输入节点的图片
+    nodes.forEach(node => {
+      if (node.type === 'input') {
+        const image = store.images[node.id];
+        if (image) {
+          flowData.images[node.id] = image;
+        }
+      }
+    });
+  }
 
   const dataStr = JSON.stringify(flowData);
   const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;

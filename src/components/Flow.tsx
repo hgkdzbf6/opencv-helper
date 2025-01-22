@@ -16,7 +16,7 @@ import ReactFlow, {
   Panel,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Button, Upload, message } from 'antd';
+import { Button, Upload, message, Modal, Radio, Space } from 'antd';
 import { SaveOutlined, UploadOutlined } from '@ant-design/icons';
 import InputNode from './nodes/InputNode';
 import OutputNode from './nodes/OutputNode';
@@ -24,8 +24,9 @@ import ProcessNode from './nodes/ProcessNode';
 import PropertiesPanel from './PropertiesPanel';
 import NodeSelector from './NodeSelector';
 import DebugPanel from './DebugPanel';
+import ResizablePanel from './ResizablePanel';
 import { useImageStore } from '../store/imageStore';
-import { saveFlow, loadFlow } from '../utils/flowUtils';
+import { saveFlow, SaveOption, loadFlow } from '../utils/flowUtils';
 
 const nodeTypes: NodeTypes = {
   input: InputNode,
@@ -63,6 +64,8 @@ const Flow = () => {
   const setStoreEdges = useImageStore((state) => state.setEdges);
   const setImage = useImageStore((state) => state.setImage);
   const setNodeParams = useImageStore((state) => state.setNodeParams);
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [saveOption, setSaveOption] = useState<SaveOption>('all');
 
   // 更新节点样式
   const updateNodeStyles = useCallback((nodes: Node[], selectedId: string | null) => {
@@ -204,14 +207,19 @@ const Flow = () => {
     [],
   );
 
-  const onSave = useCallback(() => {
+  const showSaveModal = () => {
     if (nodes.length === 0) {
       message.warning('流程图为空');
       return;
     }
-    saveFlow(nodes, edges);
+    setSaveModalVisible(true);
+  };
+
+  const handleSave = () => {
+    saveFlow(nodes, edges, saveOption);
+    setSaveModalVisible(false);
     message.success('保存成功');
-  }, [nodes, edges]);
+  };
 
   const onLoad = useCallback(async (file: File) => {
     try {
@@ -241,7 +249,10 @@ const Flow = () => {
 
   return (
     <div className="w-full h-full flex">
-      <NodeSelector onNodeAdd={onNodeAdd} />
+      <ResizablePanel width={200} position="left">
+        <NodeSelector onNodeAdd={onNodeAdd} />
+      </ResizablePanel>
+
       <div className="flex-1">
         <ReactFlow
           nodes={nodes}
@@ -266,7 +277,7 @@ const Flow = () => {
             <div className="flex gap-2">
               <Button 
                 icon={<SaveOutlined />} 
-                onClick={onSave}
+                onClick={showSaveModal}
                 type="primary"
               >
                 保存流程
@@ -287,8 +298,32 @@ const Flow = () => {
           </Panel>
         </ReactFlow>
       </div>
-      <PropertiesPanel selectedNode={selectedNode} />
-      <DebugPanel nodes={nodes} edges={edges} />
+
+      <ResizablePanel width={300} position="right">
+        <PropertiesPanel 
+          selectedNode={selectedNode} 
+          nodes={nodes}
+          edges={edges}
+        />
+      </ResizablePanel>
+
+      <Modal
+        title="保存选项"
+        open={saveModalVisible}
+        onOk={handleSave}
+        onCancel={() => setSaveModalVisible(false)}
+      >
+        <Space direction="vertical">
+          <div>选择要保存的图片：</div>
+          <Radio.Group value={saveOption} onChange={e => setSaveOption(e.target.value)}>
+            <Space direction="vertical">
+              <Radio value="all">保存所有图片</Radio>
+              <Radio value="input-only">仅保存输入图片</Radio>
+              <Radio value="none">不保存图片</Radio>
+            </Space>
+          </Radio.Group>
+        </Space>
+      </Modal>
     </div>
   );
 };
