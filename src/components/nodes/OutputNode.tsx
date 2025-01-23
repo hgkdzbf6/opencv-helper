@@ -8,7 +8,7 @@ interface OutputNodeProps {
 }
 
 const OutputNode = ({ data, className }: OutputNodeProps) => {
-  const connectedImage = useImageStore((state) => state.getConnectedNodeImage(data.id));
+  const connectedImage = useImageStore((state) => state.getConnectedNodeSourceImage(data.id));
 
   return (
     <div className={`px-4 py-2 rounded border border-gray-200 bg-white font-medium shadow-sm ${className || ''}`}>

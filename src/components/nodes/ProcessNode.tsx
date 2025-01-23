@@ -16,8 +16,8 @@ interface ProcessNodeProps {
 
 const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   const setImage = useImageStore((state) => state.setImage);
-  const getConnectedImage = useImageStore((state) => state.getConnectedNodeImage);
-  const inputImage = useImageStore((state) => state.getConnectedNodeImage(data.id, true));
+  const getConnectedImage = useImageStore((state) => state.getConnectedNodeSourceImage);
+  const inputImage = useImageStore((state) => state.getConnectedNodeSourceImage(data.id, true));
   const outputImage = useImageStore((state) => state.getImage(data.id, true));
   const setNodeParams = useImageStore((state) => state.setNodeParams);
   const nodeParams = useImageStore((state) => state.getNodeParams(data.id));
@@ -123,7 +123,7 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
       const params = nodeParams[data.type] || {};
       console.log(`[ProcessNode ${data.id}] 处理参数:`, JSON.stringify(params, null, 2));
       
-      const processed = await processImage(data.type, inputImage, params);
+      const processed = await processImage(data.processType, inputImage, params);
       console.log(`[ProcessNode ${data.id}] 图像处理完成，更新输出`);
       setImage(data.id, processed);
     } catch (error) {

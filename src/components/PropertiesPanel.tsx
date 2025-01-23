@@ -10,7 +10,7 @@ interface PropertiesPanelProps {
   selectedNode: Node | null;
   nodes: Node[];
   edges: Edge[];
-  onNodeAdd: (type: string, position: { x: number; y: number }, data: any) => void;
+  onNodeAdd: (type: string, position: { x: number; y: number }, data?: any) => void;
 }
 
 type ThresholdMethod = 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
@@ -61,86 +61,179 @@ interface SelectOption<T extends string> {
   label: string;
 }
 
+interface DrawingCanvasProps {
+  visible: boolean;
+  onClose: () => void;
+  onComplete: (params: DrawingParams) => void;
+  type: string;
+  initialImage?: string;
+}
+
+interface DrawingParams {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  radiusX?: number;
+  radiusY?: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+}
+
+const DrawingCanvas = ({ visible, onClose, onComplete, type, initialImage }: DrawingCanvasProps) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [currentPoint, setCurrentPoint] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (visible && canvasRef.current && initialImage) {
+      const ctx = canvasRef.current.getContext('2d');
+      const img = new Image();
+      img.onload = () => {
+        if (ctx && canvasRef.current) {
+          canvasRef.current.width = img.width;
+          canvasRef.current.height = img.height;
+          ctx.drawImage(img, 0, 0);
+        }
+      };
+      img.src = initialImage;
+    }
+  }, [visible, initialImage]);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setStartPoint({ x, y });
+    setCurrentPoint({ x, y });
+    setIsDrawing(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setCurrentPoint({ x, y });
+
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    // 清除上一次的预览
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    if (initialImage) {
+      const img = new Image();
+      img.src = initialImage;
+      ctx.drawImage(img, 0, 0);
+    }
+
+    // 绘制预览
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    if (type === 'draw-rect') {
+      const width = currentPoint.x - startPoint.x;
+      const height = currentPoint.y - startPoint.y;
+      ctx.rect(startPoint.x, startPoint.y, width, height);
+    } else if (type === 'draw-circle') {
+      const rx = Math.abs(currentPoint.x - startPoint.x);
+      const ry = Math.abs(currentPoint.y - startPoint.y);
+      ctx.ellipse(
+        startPoint.x,
+        startPoint.y,
+        rx,
+        ry,
+        0,
+        0,
+        2 * Math.PI
+      );
+    } else if (type === 'draw-line') {
+      ctx.moveTo(startPoint.x, startPoint.y);
+      ctx.lineTo(currentPoint.x, currentPoint.y);
+    }
+
+    ctx.stroke();
+  };
+
+  const handleMouseUp = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+
+    // 计算参数
+    let params: DrawingParams = {};
+    
+    if (type === 'draw-rect') {
+      params = {
+        x: Math.min(startPoint.x, currentPoint.x),
+        y: Math.min(startPoint.y, currentPoint.y),
+        width: Math.abs(currentPoint.x - startPoint.x),
+        height: Math.abs(currentPoint.y - startPoint.y)
+      };
+    } else if (type === 'draw-circle') {
+      params = {
+        x: startPoint.x,
+        y: startPoint.y,
+        radiusX: Math.abs(currentPoint.x - startPoint.x),
+        radiusY: Math.abs(currentPoint.y - startPoint.y)
+      };
+    } else if (type === 'draw-line') {
+      params = {
+        x1: startPoint.x,
+        y1: startPoint.y,
+        x2: currentPoint.x,
+        y2: currentPoint.y
+      };
+    }
+
+    onComplete(params);
+  };
+
+  return (
+    <Modal
+      open={visible}
+      onCancel={onClose}
+      width="80%"
+      footer={null}
+      title="绘制图形"
+    >
+      <canvas
+        ref={canvasRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        style={{ border: '1px solid #d9d9d9', cursor: 'crosshair' }}
+      />
+    </Modal>
+  );
+};
+
 const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => {
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
   const setNodeParams = useImageStore((state) => state.setNodeParams);
   const nodeParams = useImageStore((state) => state.getNodeParams(nodeId));
-  const setImage = useImageStore((state) => state.setImage);
-
-  if (type === 'blank') {
-    const width = nodeParams?.blank?.width || 640;
-    const height = nodeParams?.blank?.height || 480;
-    const color = nodeParams?.blank?.color || [255, 255, 255];
-
-    const handleParamChange = (key: string, value: any) => {
-      setNodeParams(nodeId, {
-        blank: {
-          ...nodeParams?.blank,
-          [key]: value
-        }
-      });
-
-      // 创建空白图像
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-        ctx.fillRect(0, 0, width, height);
-        setImage(nodeId, canvas.toDataURL());
-      }
-    };
-
-    return (
-      <div className="space-y-4">
-        <div>
-          <div className="mb-2">宽度</div>
-          <InputNumber
-            min={1}
-            max={4096}
-            value={width}
-            onChange={(value) => handleParamChange('width', value)}
-          />
-        </div>
-        <div>
-          <div className="mb-2">高度</div>
-          <InputNumber
-            min={1}
-            max={4096}
-            value={height}
-            onChange={(value) => handleParamChange('height', value)}
-          />
-        </div>
-        <div>
-          <div className="mb-2">背景颜色</div>
-          <div className="flex gap-2">
-            <InputNumber
-              min={0}
-              max={255}
-              value={color[0]}
-              onChange={(value) => handleParamChange('color', [value, color[1], color[2]])}
-            />
-            <InputNumber
-              min={0}
-              max={255}
-              value={color[1]}
-              onChange={(value) => handleParamChange('color', [color[0], value, color[2]])}
-            />
-            <InputNumber
-              min={0}
-              max={255}
-              value={color[2]}
-              onChange={(value) => handleParamChange('color', [color[0], color[1], value])}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  const inputImage = useImageStore((state) => state.getConnectedNodeSourceImage(nodeId, true));
   const currentParams = (nodeParams?.[type] || {}) as NodeTypeParams;
 
-  const onParamChange = (key: ParamKey, value: NodeTypeParams[ParamKey]) => {
+
+  const handleDrawingComplete = (params: DrawingParams) => {
+    setIsDrawingMode(false);
+    if (type === 'draw-circle') {
+      const { x, y, radiusX, radiusY } = params;
+      const radius = Math.max(radiusX || 0, radiusY || 0);
+      setNodeParams(nodeId, { [type]: { ...currentParams, x, y, radius } });
+    } else {
+      setNodeParams(nodeId, { [type]: { ...currentParams, ...params } });
+    }
+  };
+
+  const onParamChange = (key: ParamKey, value: any) => {
+    console.log('Parameter change:', key, value); // 添加日志
     setNodeParams(nodeId, { [type]: { ...currentParams, [key]: value } });
   };
 
@@ -213,118 +306,103 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
     </div>
   );
 
-  switch (type) {
-    case 'binary':
-      return (
-        <div className="mt-4">
-          {renderSlider('阈值', 'threshold', 0, 255, 1, 128)}
-          {renderSlider('最大值', 'maxValue', 0, 255, 1, 255)}
-          {renderSelect<ThresholdMethod>('二值化方法', 'method', [
-            { value: 'THRESH_BINARY', label: '二值化' },
-            { value: 'THRESH_BINARY_INV', label: '反二值化' },
-            { value: 'THRESH_TRUNC', label: '截断' },
-            { value: 'THRESH_TOZERO', label: '阈值化为零' },
-            { value: 'THRESH_TOZERO_INV', label: '反阈值化为零' },
-          ], 'THRESH_BINARY')}
-          {renderSwitch('使用 Otsu 算法', 'useOtsu', false)}
-        </div>
-      );
+  const content = (() => {
+    console.log('Rendering controls for type:', type); // 添加日志
+    switch (type) {
+      case 'blur':
+        return (
+          <div className="space-y-4">
+            {renderSlider('核大小', 'kernelSize', 1, 31, 2, 5)}
+            {renderSlider('X方向标准差', 'sigmaX', 0, 10, 0.1, 0)}
+            {renderSlider('Y方向标准差', 'sigmaY', 0, 10, 0.1, 0)}
+            {renderSelect('边界类型', 'borderType', [
+              { value: 'BORDER_DEFAULT', label: '默认' },
+              { value: 'BORDER_CONSTANT', label: '常量' },
+              { value: 'BORDER_REPLICATE', label: '复制' },
+            ], 'BORDER_DEFAULT')}
+          </div>
+        );
 
-    case 'blur':
-      return (
-        <div className="mt-4">
-          {renderSlider('核大小', 'kernelSize', 3, 25, 2, 5)}
-          {renderSlider('X方向标准差', 'sigmaX', 0, 10, 0.1, 0)}
-          {renderSlider('Y方向标准差', 'sigmaY', 0, 10, 0.1, 0)}
-          {renderSelect<BorderType>('边界类型', 'borderType', [
-            { value: 'BORDER_DEFAULT', label: '默认' },
-            { value: 'BORDER_CONSTANT', label: '常数' },
-            { value: 'BORDER_REPLICATE', label: '复制' },
-          ], 'BORDER_DEFAULT')}
-        </div>
-      );
+      case 'draw-rect':
+      case 'draw-circle':
+      case 'draw-line':
+        return (
+          <div className="space-y-4">
+            <Button onClick={() => setIsDrawingMode(true)} block>
+              重新绘制
+            </Button>
+            {renderColorPicker('颜色', 'color', [255, 0, 0])}
+            {renderSlider('线条粗细', 'thickness', 1, 20, 1, 2)}
+            {renderSelect('线条类型', 'lineType', [
+              { value: 'LINE_4', label: '4连通' },
+              { value: 'LINE_8', label: '8连通' },
+              { value: 'LINE_AA', label: '抗锯齿' },
+            ], 'LINE_8')}
+            {(type === 'draw-rect' || type === 'draw-circle') && (
+              renderSwitch('填充', 'filled', false)
+            )}
+            {isDrawingMode && (
+              <DrawingCanvas
+                visible={isDrawingMode}
+                onClose={() => setIsDrawingMode(false)}
+                onComplete={handleDrawingComplete}
+                type={type}
+                initialImage={inputImage}
+              />
+            )}
+          </div>
+        );
 
-    case 'erode':
-    case 'dilate':
-      return (
-        <div className="mt-4">
-          {renderSlider('核大小', 'kernelSize', 3, 25, 2, 3)}
-          {renderSlider('迭代次数', 'iterations', 1, 10, 1, 1)}
-          {renderSelect<KernelShape>('核形状', 'kernelShape', [
-            { value: 'MORPH_RECT', label: '矩形' },
-            { value: 'MORPH_CROSS', label: '十字形' },
-            { value: 'MORPH_ELLIPSE', label: '椭圆形' },
-          ], 'MORPH_RECT')}
-          {renderSlider('锚点 X', 'anchorX', -1, 1, 1, -1)}
-          {renderSlider('锚点 Y', 'anchorY', -1, 1, 1, -1)}
-        </div>
-      );
+      case 'binary':
+        return (
+          <div className="space-y-4">
+            {renderSlider('阈值', 'threshold', 0, 255, 1, 128)}
+            {renderSlider('最大值', 'maxValue', 0, 255, 1, 255)}
+            {renderSelect('方法', 'method', [
+              { value: 'THRESH_BINARY', label: '二值化' },
+              { value: 'THRESH_BINARY_INV', label: '反二值化' },
+              { value: 'THRESH_TRUNC', label: '截断' },
+              { value: 'THRESH_TOZERO', label: '阈值化为零' },
+              { value: 'THRESH_TOZERO_INV', label: '反阈值化为零' },
+            ], 'THRESH_BINARY')}
+            {renderSwitch('使用 Otsu 算法', 'useOtsu', false)}
+          </div>
+        );
 
-    case 'edge':
-      return (
-        <div className="mt-4">
-          {renderSlider('阈值1', 'threshold1', 0, 255, 1, 100)}
-          {renderSlider('阈值2', 'threshold2', 0, 255, 1, 200)}
-          {renderSlider('孔径大小', 'apertureSize', 3, 7, 2, 3)}
-          {renderSwitch('使用 L2 梯度', 'l2gradient', false)}
-        </div>
-      );
+      case 'erode':
+      case 'dilate':
+        return (
+          <div className="space-y-4">
+            {renderSlider('核大小', 'kernelSize', 1, 31, 2, 3)}
+            {renderSlider('迭代次数', 'iterations', 1, 10, 1, 1)}
+            {renderSelect('核形状', 'kernelShape', [
+              { value: 'MORPH_RECT', label: '矩形' },
+              { value: 'MORPH_CROSS', label: '十字形' },
+              { value: 'MORPH_ELLIPSE', label: '椭圆形' },
+            ], 'MORPH_RECT')}
+          </div>
+        );
 
-    case 'draw-rect':
-      return (
-        <div className="mt-4">
-          {renderSlider('X 坐标', 'x', 0, 1000, 1, 0)}
-          {renderSlider('Y 坐标', 'y', 0, 1000, 1, 0)}
-          {renderSlider('宽度', 'width', 1, 1000, 1, 100)}
-          {renderSlider('高度', 'height', 1, 1000, 1, 100)}
-          {renderColorPicker('颜色', 'color', [255, 0, 0])}
-          {renderSlider('线条粗细', 'thickness', 1, 10, 1, 2)}
-          {renderSelect<LineType>('线条类型', 'lineType', [
-            { value: 'LINE_4', label: '4连通' },
-            { value: 'LINE_8', label: '8连通' },
-            { value: 'LINE_AA', label: '抗锯齿' },
-          ], 'LINE_8')}
-          {renderSwitch('填充', 'filled', false)}
-        </div>
-      );
+      case 'edge':
+        return (
+          <div className="space-y-4">
+            {renderSlider('阈值1', 'threshold1', 0, 255, 1, 100)}
+            {renderSlider('阈值2', 'threshold2', 0, 255, 1, 200)}
+            {renderSlider('孔径大小', 'apertureSize', 3, 7, 2, 3)}
+            {renderSwitch('使用 L2 梯度', 'l2gradient', false)}
+          </div>
+        );
 
-    case 'draw-circle':
-      return (
-        <div className="mt-4">
-          {renderSlider('X 坐标', 'x', 0, 1000, 1, 50)}
-          {renderSlider('Y 坐标', 'y', 0, 1000, 1, 50)}
-          {renderSlider('半径', 'radius', 1, 500, 1, 25)}
-          {renderColorPicker('颜色', 'color', [0, 255, 0])}
-          {renderSlider('线条粗细', 'thickness', 1, 10, 1, 2)}
-          {renderSelect<LineType>('线条类型', 'lineType', [
-            { value: 'LINE_4', label: '4连通' },
-            { value: 'LINE_8', label: '8连通' },
-            { value: 'LINE_AA', label: '抗锯齿' },
-          ], 'LINE_8')}
-          {renderSwitch('填充', 'filled', false)}
-        </div>
-      );
+      default:
+        return null;
+    }
+  })();
 
-    case 'draw-line':
-      return (
-        <div className="mt-4">
-          {renderSlider('起点 X', 'x1', 0, 1000, 1, 0)}
-          {renderSlider('起点 Y', 'y1', 0, 1000, 1, 0)}
-          {renderSlider('终点 X', 'x2', 0, 1000, 1, 100)}
-          {renderSlider('终点 Y', 'y2', 0, 1000, 1, 100)}
-          {renderColorPicker('颜色', 'color', [0, 0, 255])}
-          {renderSlider('线条粗细', 'thickness', 1, 10, 1, 2)}
-          {renderSelect<LineType>('线条类型', 'lineType', [
-            { value: 'LINE_4', label: '4连通' },
-            { value: 'LINE_8', label: '8连通' },
-            { value: 'LINE_AA', label: '抗锯齿' },
-          ], 'LINE_8')}
-        </div>
-      );
-
-    default:
-      return null;
-  }
+  return (
+    <div className="space-y-4">
+      {content}
+    </div>
+  );
 };
 
 const CodeGeneratorPanel = ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) => {
@@ -368,259 +446,75 @@ const CodeGeneratorPanel = ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) 
   );
 };
 
-const DrawingCanvas = ({ image, onDrawComplete, initialParams }: { 
-  image: string; 
-  onDrawComplete: (type: 'rect' | 'circle' | 'line', params: any) => void;
-  initialParams?: any;
-}) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [drawingTool, setDrawingTool] = useState<'rect' | 'circle' | 'line'>(
-    initialParams ? (
-      initialParams.radius ? 'circle' : 
-      initialParams.x1 !== undefined ? 'line' : 'rect'
-    ) : 'rect'
-  );
-  const [previewCtx, setPreviewCtx] = useState<CanvasRenderingContext2D | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    setPreviewCtx(ctx);
-
-    // 加载图片
-    const img = new Image();
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-
-      // 如果有初始参数，绘制初始形状
-      if (initialParams) {
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 2;
-
-        if (initialParams.radius) {
-          // 绘制椭圆
-          ctx.beginPath();
-          ctx.ellipse(
-            initialParams.x,
-            initialParams.y,
-            initialParams.radiusX || initialParams.radius,
-            initialParams.radiusY || initialParams.radius,
-            0,
-            0,
-            2 * Math.PI
-          );
-          ctx.stroke();
-          setStartPoint({
-            x: initialParams.x - (initialParams.radiusX || initialParams.radius),
-            y: initialParams.y - (initialParams.radiusY || initialParams.radius)
-          });
-        } else if (initialParams.x1 !== undefined) {
-          // 绘制直线
-          ctx.beginPath();
-          ctx.moveTo(initialParams.x1, initialParams.y1);
-          ctx.lineTo(initialParams.x2, initialParams.y2);
-          ctx.stroke();
-          setStartPoint({ x: initialParams.x1, y: initialParams.y1 });
-        } else {
-          // 绘制矩形
-          ctx.strokeRect(
-            initialParams.x,
-            initialParams.y,
-            initialParams.width,
-            initialParams.height
-          );
-          setStartPoint({
-            x: initialParams.x,
-            y: initialParams.y
-          });
-        }
-      }
-    };
-    img.src = image;
-  }, [image, initialParams]);
-
-  const drawShape = useCallback((ctx: CanvasRenderingContext2D, currentPoint: { x: number; y: number }) => {
-    if (!ctx || !startPoint) return;
-
-    const width = currentPoint.x - startPoint.x;
-    const height = currentPoint.y - startPoint.y;
-
-    // 清除之前的预览
-    const img = new Image();
-    img.onload = () => {
-      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      ctx.drawImage(img, 0, 0);
-
-      ctx.strokeStyle = '#ff0000';
-      ctx.lineWidth = 2;
-
-      if (drawingTool === 'rect') {
-        ctx.strokeRect(startPoint.x, startPoint.y, width, height);
-      } else if (drawingTool === 'circle') {
-        const centerX = startPoint.x + width / 2;
-        const centerY = startPoint.y + height / 2;
-        const radiusX = Math.abs(width / 2);
-        const radiusY = Math.abs(height / 2);
-        ctx.beginPath();
-        ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
-        ctx.stroke();
-      } else if (drawingTool === 'line') {
-        ctx.beginPath();
-        ctx.moveTo(startPoint.x, startPoint.y);
-        ctx.lineTo(currentPoint.x, currentPoint.y);
-        ctx.stroke();
-      }
-    };
-    img.src = image;
-  }, [startPoint, drawingTool, image]);
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    setIsDrawing(true);
-    setStartPoint({ x, y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !previewCtx) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const currentPoint = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-
-    drawShape(previewCtx, currentPoint);
-  };
-
-  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !startPoint) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const endPoint = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-
-    setIsDrawing(false);
-
-    if (drawingTool === 'rect') {
-      const width = Math.abs(endPoint.x - startPoint.x);
-      const height = Math.abs(endPoint.y - startPoint.y);
-      const x = Math.min(startPoint.x, endPoint.x);
-      const y = Math.min(startPoint.y, endPoint.y);
-      onDrawComplete('rect', { x, y, width, height });
-    } else if (drawingTool === 'circle') {
-      const width = endPoint.x - startPoint.x;
-      const height = endPoint.y - startPoint.y;
-      const centerX = startPoint.x + width / 2;
-      const centerY = startPoint.y + height / 2;
-      const radiusX = Math.abs(width / 2);
-      const radiusY = Math.abs(height / 2);
-      onDrawComplete('circle', { x: centerX, y: centerY, radiusX, radiusY });
-    } else if (drawingTool === 'line') {
-      onDrawComplete('line', {
-        x1: startPoint.x,
-        y1: startPoint.y,
-        x2: endPoint.x,
-        y2: endPoint.y
-      });
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="border rounded overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          style={{ maxWidth: '100%', height: 'auto' }}
-        />
-      </div>
-    </div>
-  );
-};
-
 const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPanelProps) => {
   const [previewVisible, setPreviewVisible] = useState(false);
   const setImage = useImageStore((state) => state.setImage);
-  const getConnectedImage = useImageStore((state) => state.getConnectedNodeImage);
+  const getImage = useImageStore((state) => state.getImage);
+  const getConnectedImage = useImageStore((state) => state.getConnectedNodeSourceImage);
   const toggleNodesPreview = useImageStore((state) => state.toggleNodesPreview);
   const showNodesPreview = useImageStore((state) => state.showNodesPreview);
-  const nodeParams = useImageStore((state) => state.nodeParams);
+  const nodeParams = useImageStore((state) => state.getNodeParams);
   const setNodeParams = useImageStore((state) => state.setNodeParams);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [drawingTool, setDrawingTool] = useState<'rect' | 'circle' | 'line'>('rect');
+  const [selectedBackgroundNode, setSelectedBackgroundNode] = useState<string | undefined>();
 
-  // 使用 useMemo 缓存图片获取结果
-  const image = useMemo(() => {
+  const inputImage = useMemo(() => {
     if (!selectedNode) return undefined;
-    return selectedNode.type === 'output'
-      ? getConnectedImage(selectedNode.data.id, true)
-      : useImageStore.getState().getImage(selectedNode.data.id, true);
+    console.log('节点id为',selectedNode.id,'的inputImage 是什么：', getConnectedImage(selectedNode.id, true));
+    return getConnectedImage(selectedNode.id, true);
   }, [selectedNode, getConnectedImage]);
 
-  const handleDrawComplete = useCallback((type: 'rect' | 'circle' | 'line', params: any) => {
+  const outputImage = useMemo(() => {
+    if (!selectedNode) return undefined;
+    console.log('节点id为',selectedNode.id,'的outputImage 是什么：', getConnectedImage(selectedNode.id, false));
+    return getImage(selectedNode.id, false);
+  }, [selectedNode, getImage]);
+
+  const getAvailableNodes = useMemo(() => {
+    return nodes.filter(node => node.id !== selectedNode?.id && 
+      (node.type === 'input' || node.type === 'process'));
+  }, [nodes, selectedNode]);
+
+  const backgroundImage = useMemo(() => {
+    if (!selectedBackgroundNode) return inputImage;
+    return useImageStore.getState().getImage(selectedBackgroundNode, true);
+  }, [selectedBackgroundNode, inputImage]);
+
+  const handleDrawComplete = useCallback((params: DrawingParams) => {
     if (selectedNode?.type === 'process' && 
-        (selectedNode.data.type === 'draw-rect' || selectedNode.data.type === 'draw-circle' || selectedNode.data.type === 'draw-line')) {
-      // 更新现有节点的参数
-      setNodeParams(selectedNode.data.id, { 
-        [selectedNode.data.type]: {
-          ...params,
-          color: nodeParams[selectedNode.data.id]?.[selectedNode.data.type]?.color || [255, 0, 0],
-          thickness: nodeParams[selectedNode.data.id]?.[selectedNode.data.type]?.thickness || 2,
-          lineType: nodeParams[selectedNode.data.id]?.[selectedNode.data.type]?.lineType || 'LINE_8',
-          filled: nodeParams[selectedNode.data.id]?.[selectedNode.data.type]?.filled || false
-        }
-      });
-      message.success('形状已更新');
-    } else {
-      // 创建新节点
-      const nodeType = type === 'rect' ? 'draw-rect' : type === 'circle' ? 'draw-circle' : 'draw-line';
-      const label = type === 'rect' ? '⬜️ 绘制矩形' : type === 'circle' ? '⭕️ 绘制圆形' : '直线';
+        (selectedNode.data.processType === 'draw-rect' || 
+         selectedNode.data.processType === 'draw-circle' || 
+         selectedNode.data.processType === 'draw-line')) {
+      const currentParams = nodeParams(selectedNode.id)?.[selectedNode.data.processType] || {};
       
-      onNodeAdd('process', { x: 100, y: 100 }, { 
-        type: nodeType, 
-        label,
-        params: {
-          ...params,
-          color: [255, 0, 0],
-          thickness: 2,
-          lineType: 'LINE_8',
-          filled: false
-        }
-      });
-      
-      message.success(`已添加${type === 'rect' ? '矩形' : type === 'circle' ? '椭圆形' : '直线'}节点`);
+      if (selectedNode.data.processType === 'draw-circle') {
+        const { x, y, radiusX, radiusY, ...rest } = params;
+        const radius = Math.max(radiusX || 0, radiusY || 0);
+        setNodeParams(selectedNode.id, { 
+          [selectedNode.data.processType]: { 
+            ...currentParams, 
+            x, 
+            y, 
+            radius, 
+            ...rest 
+          } 
+        });
+      } else {
+        setNodeParams(selectedNode.id, { 
+          [selectedNode.data.processType]: { 
+            ...currentParams, 
+            ...params 
+          } 
+        });
+      }
     }
-    setPreviewVisible(false);
     setIsDrawingMode(false);
-  }, [onNodeAdd, selectedNode, nodeParams, setNodeParams]);
+  }, [selectedNode, nodeParams, setNodeParams]);
 
   const handlePreviewClick = useCallback(() => {
     if (selectedNode?.type === 'process' && 
-        (selectedNode.data.type === 'draw-rect' || selectedNode.data.type === 'draw-circle' || selectedNode.data.type === 'draw-line')) {
+        (selectedNode.data.processType === 'draw-rect' || selectedNode.data.processType === 'draw-circle' || selectedNode.data.processType === 'draw-line')) {
       setIsDrawingMode(true);
     }
     setPreviewVisible(true);
@@ -678,15 +572,15 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
         </div>
       </div>
 
-      <Card title="图片预览" className="mb-4" size="small">
+      <Card title="输入图片预览" className="mb-4" size="small">
         <div 
           className="w-full bg-gray-50 rounded flex items-center justify-center overflow-hidden"
-          onClick={image ? handlePreviewClick : undefined}
-          style={{ cursor: image ? 'pointer' : 'default' }}
+          onClick={inputImage ? handlePreviewClick : undefined}
+          style={{ cursor: inputImage ? 'pointer' : 'default' }}
         >
-          {image ? (
+          {inputImage ? (
             <img 
-              src={image} 
+              src={inputImage} 
               alt="预览" 
               className="max-w-full max-h-full object-contain"
             />
@@ -696,6 +590,26 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
               {selectedNode?.type === 'input' && 
                 <div className="text-xs">请点击下方按钮上传</div>
               }
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card title="输出图片预览" className="mb-4" size="small">
+        <div 
+          className="w-full bg-gray-50 rounded flex items-center justify-center overflow-hidden"
+          onClick={outputImage ? handlePreviewClick : undefined}
+          style={{ cursor: outputImage ? 'pointer' : 'default' }}
+        >
+          {outputImage ? (
+            <img 
+              src={outputImage} 
+              alt="预览" 
+              className="max-w-full max-h-full object-contain"
+            />
+          ) : (
+            <div className="text-gray-400 text-center">
+              <div className="mb-1">暂无图片</div>
             </div>
           )}
         </div>
@@ -725,7 +639,7 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
       {selectedNode.type === 'process' && (
         <ProcessControls 
           nodeId={selectedNode.data.id} 
-          type={selectedNode.data.type} 
+          type={selectedNode.data.processType} 
         />
       )}
 
@@ -733,20 +647,35 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
         open={previewVisible}
         footer={
           <div className="flex justify-between items-center">
-            <div>
+            <div className="flex items-center gap-4">
               {(selectedNode?.type === 'process' && 
-                (selectedNode.data.type === 'draw-rect' || 
-                 selectedNode.data.type === 'draw-circle' || 
-                 selectedNode.data.type === 'draw-line') || 
+                (selectedNode.data.processType === 'draw-rect' || 
+                 selectedNode.data.processType === 'draw-circle' || 
+                 selectedNode.data.processType === 'draw-line') || 
                 !selectedNode) && (
-                <Radio.Group 
-                  value={drawingTool}
-                  onChange={e => handleToolChange(e.target.value)}
-                >
-                  <Radio.Button value="rect">矩形</Radio.Button>
-                  <Radio.Button value="circle">椭圆</Radio.Button>
-                  <Radio.Button value="line">直线</Radio.Button>
-                </Radio.Group>
+                <>
+                  <Radio.Group 
+                    value={drawingTool}
+                    onChange={e => handleToolChange(e.target.value)}
+                  >
+                    <Radio.Button value="rect">矩形</Radio.Button>
+                    <Radio.Button value="circle">椭圆</Radio.Button>
+                    <Radio.Button value="line">直线</Radio.Button>
+                  </Radio.Group>
+                  <Select
+                    style={{ width: 200 }}
+                    placeholder="选择背景图片"
+                    value={selectedBackgroundNode}
+                    onChange={setSelectedBackgroundNode}
+                    allowClear
+                  >
+                    {getAvailableNodes.map(node => (
+                      <Select.Option key={node.id} value={node.id}>
+                        {node.data.label} (ID: {node.id})
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </>
               )}
             </div>
             <Button onClick={() => {
@@ -766,20 +695,18 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
         styles={{ body: { padding: 0 } }}
       >
         <div className="w-full h-[80vh] bg-gray-50 flex items-center justify-center">
-          {image && (
+          {(backgroundImage || inputImage) && (
             isDrawingMode ? (
               <DrawingCanvas 
-                image={image} 
-                onDrawComplete={handleDrawComplete}
-                initialParams={
-                  selectedNode?.type === 'process' ? 
-                  nodeParams[selectedNode.data.id]?.[selectedNode.data.type] : 
-                  undefined
-                }
+                visible={isDrawingMode}
+                onClose={() => setIsDrawingMode(false)}
+                onComplete={handleDrawComplete}
+                type={drawingTool}
+                initialImage={backgroundImage || inputImage}
               />
             ) : (
               <img 
-                src={image} 
+                src={backgroundImage || inputImage} 
                 alt="大图预览" 
                 className="max-w-full max-h-full object-contain"
               />

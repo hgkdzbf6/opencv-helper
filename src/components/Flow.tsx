@@ -163,10 +163,11 @@ const Flow = () => {
         data: {
           id: nodeId,
           label: node.label,
-          processType: node.type,
+          processType: node.processType,
           type: node.type
         }
       };
+
 
       setNodes((nds) => nds.concat(newNode));
     },
@@ -183,10 +184,11 @@ const Flow = () => {
       data: {
         id: nodeId,
         label: data?.label || type,
-        type: data?.type
+        type: data?.type,
+        processType: data?.processType
       }
     };
-
+    console.log('需要添加这样一个节点：', newNode);
     setNodes((nds) => nds.concat(newNode));
   }, [setNodes]);
 

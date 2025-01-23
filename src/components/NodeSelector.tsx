@@ -55,7 +55,7 @@ const nodeCategories: Record<string, NodeCategory> = {
     title: '绘图工具',
     nodes: [
       { type: 'process', processType: 'draw-rect', label: '⬜️ 绘制矩形', description: '在图像上绘制矩形' },
-      { type: 'process', processType: 'draw-circle', label: '🔴 绘制椭圆', description: '在图像上绘制椭圆' },
+      { type: 'process', processType: 'draw-circle', label: '🔴 绘制椭圆', description: '在图像上绘制椭圆形，可调整长轴和短轴' },
       { type: 'process', processType: 'draw-line', label: '➖ 绘制直线', description: '在图像上绘制直线' }
     ]
   },
@@ -83,8 +83,8 @@ const NodeSelector = ({ onNodeAdd }: NodeSelectorProps) => {
     const data = {
       type: node.type,
       label: node.label,
-      ...(node.type === 'process' ? { type: node.processType } : {}),
-      ...(node.type === 'input' && node.data ? { type: node.data.type } : {})
+      ...(node.type === 'process' ? { processType: node.processType } : {}),
+      ...(node.type === 'input' && node.data ? { data: node.data } : {})
     };
     event.dataTransfer.setData('application/reactflow', JSON.stringify(data));
     event.dataTransfer.effectAllowed = 'move';
@@ -93,7 +93,7 @@ const NodeSelector = ({ onNodeAdd }: NodeSelectorProps) => {
   const onNodeClick = (node: NodeType) => {
     let data;
     if (node.type === 'process') {
-      data = { type: node.processType, label: node.label };
+      data = { type: node.type, processType: node.processType, label: node.label };
     } else if (node.type === 'input') {
       data = node.data ? { type: node.data.type, label: node.label } : undefined;
     }

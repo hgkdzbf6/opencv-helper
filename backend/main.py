@@ -271,7 +271,7 @@ async def process_image(request: ImageProcessRequest):
             raise HTTPException(status_code=400, detail=f"不支持的处理类型: {request.type}")
             
         if result is None:
-            raise HTTPException(status_code=500, detail="图像处理失败")
+            raise HTTPException(status_code=500, detail="图像处理失败: result 为空")
             
         print("图像处理完成,开始编码返回...")
         # 将处理后的图像转换为 base64

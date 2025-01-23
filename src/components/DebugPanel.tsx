@@ -13,7 +13,7 @@ interface DebugPanelProps {
 const DebugPanel: React.FC<DebugPanelProps> = ({ logs, nodes, edges }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const { images, getConnectedNodeImage } = useImageStore();
+  const { images, getConnectedNodeSourceImage: getConnectedNodeImage } = useImageStore();
 
   const debugFlow = () => {
     console.group('流程图调试信息');
