@@ -16,7 +16,7 @@ export interface NodeParams {
     anchor?: { x: number; y: number };
     threshold1?: number;
     threshold2?: number;
-    apertureSize?: string;
+    apertureSize?: number;
     l2gradient?: boolean;
     blendAlpha?: number;
     x?: number;
@@ -41,9 +41,9 @@ interface ImageState {
   showNodesPreview: boolean;
   nodeParams: Record<string, NodeParams>;
   setImage: (nodeId: string, imageData: string) => void;
-  getImage: (nodeId: string) => string | undefined;
+  getImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
   setEdges: (edges: Edge[]) => void;
-  getConnectedNodeImage: (nodeId: string) => string | undefined;
+  getConnectedNodeImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
   toggleNodesPreview: () => void;
   setNodeParams: (nodeId: string, params: NodeParams) => void;
   getNodeParams: (nodeId: string) => NodeParams | undefined;
@@ -64,21 +64,24 @@ export const useImageStore = create<ImageState>((set, get) => ({
     }));
   },
 
-  getImage: (nodeId: string) => {
-    return get().images[nodeId];
+  getImage: (nodeId: string, ignorePreviewSetting = false) => {
+    const state = get();
+    return (ignorePreviewSetting || state.showNodesPreview) ? state.images[nodeId] : undefined;
   },
 
   setEdges: (edges: Edge[]) => {
     set({ edges });
   },
 
-  getConnectedNodeImage: (nodeId: string) => {
+  getConnectedNodeImage: (nodeId: string, ignorePreviewSetting = false) => {
     const state = get();
-    const edge = state.edges.find(edge => edge.target === nodeId);
-    if (!edge) {
-      return undefined;
-    }
-    return state.images[edge.source];
+    if (!ignorePreviewSetting && !state.showNodesPreview) return undefined;
+    
+    const edges = state.edges;
+    const sourceEdge = edges.find(edge => edge.target === nodeId);
+    if (!sourceEdge) return undefined;
+    
+    return state.images[sourceEdge.source];
   },
 
   toggleNodesPreview: () => {

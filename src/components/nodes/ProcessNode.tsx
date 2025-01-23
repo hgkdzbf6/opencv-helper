@@ -7,7 +7,8 @@ interface ProcessNodeProps {
   id: string;
   data: {
     id: string;
-    type: 'binary' | 'blur' | 'erode' | 'dilate' | 'edge' | 'mask' | 'invert-mask' | 'draw-rect' | 'draw-circle' | 'draw-line';
+    type: 'process' | 'input' | 'output';
+    processType: 'binary' | 'blur' | 'erode' | 'dilate' | 'edge' | 'mask' | 'invert-mask' | 'draw-rect' | 'draw-circle' | 'draw-line';
     label: string;
   };
   className?: string;
@@ -16,8 +17,8 @@ interface ProcessNodeProps {
 const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   const setImage = useImageStore((state) => state.setImage);
   const getConnectedImage = useImageStore((state) => state.getConnectedNodeImage);
-  const inputImage = useImageStore((state) => state.getConnectedNodeImage(data.id));
-  const outputImage = useImageStore((state) => state.getImage(data.id));
+  const inputImage = useImageStore((state) => state.getConnectedNodeImage(data.id, true));
+  const outputImage = useImageStore((state) => state.getImage(data.id, true));
   const setNodeParams = useImageStore((state) => state.setNodeParams);
   const nodeParams = useImageStore((state) => state.getNodeParams(data.id));
   const showNodesPreview = useImageStore((state) => state.showNodesPreview);
@@ -26,35 +27,47 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   useEffect(() => {
     if (!nodeParams) {
       const defaultParams = {
-        binary: { 
+        'binary': { 
           threshold: 128,
           maxValue: 255,
-          method: 'THRESH_BINARY',
+          method: 'THRESH_BINARY' as const,
           useOtsu: false
         },
-        blur: { 
+        'blur': { 
           kernelSize: 5,
           sigmaX: 0,
           sigmaY: 0,
-          borderType: 'BORDER_DEFAULT'
+          borderType: 'BORDER_DEFAULT' as const
         },
-        erode: { 
+        'erode': { 
           kernelSize: 3,
           iterations: 1,
-          kernelShape: 'MORPH_RECT',
+          kernelShape: 'MORPH_RECT' as const,
           anchor: { x: -1, y: -1 }
         },
-        dilate: { 
+        'dilate': { 
           kernelSize: 3,
           iterations: 1,
-          kernelShape: 'MORPH_RECT',
+          kernelShape: 'MORPH_RECT' as const,
           anchor: { x: -1, y: -1 }
         },
-        edge: { 
+        'edge': { 
           threshold1: 100,
           threshold2: 200,
           apertureSize: 3,
           l2gradient: false
+        },
+        'mask': {
+          threshold: 128,
+          maxValue: 255,
+          method: 'THRESH_BINARY' as const,
+          blendAlpha: 0.5
+        },
+        'invert-mask': {
+          threshold: 128,
+          maxValue: 255,
+          method: 'THRESH_BINARY' as const,
+          blendAlpha: 0.5
         },
         'draw-rect': { 
           x: 0,
@@ -63,7 +76,7 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
           height: 100,
           color: [255, 0, 0] as [number, number, number],
           thickness: 2,
-          lineType: 'LINE_8',
+          lineType: 'LINE_8' as const,
           filled: false
         },
         'draw-circle': { 
@@ -72,7 +85,7 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
           radius: 25,
           color: [0, 255, 0] as [number, number, number],
           thickness: 2,
-          lineType: 'LINE_8',
+          lineType: 'LINE_8' as const,
           filled: false
         },
         'draw-line': { 
@@ -82,19 +95,25 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
           y2: 100,
           color: [0, 0, 255] as [number, number, number],
           thickness: 2,
-          lineType: 'LINE_8'
+          lineType: 'LINE_8' as const
         }
-      }[data.type];
+      }[data.processType];
       
       if (defaultParams) {
-        setNodeParams(data.id, { [data.type]: defaultParams });
+        setNodeParams(data.id, { [data.processType]: defaultParams });
       }
     }
-  }, [data.id, data.type, nodeParams, setNodeParams]);
+  }, [data.id, data.type, data.processType, nodeParams, setNodeParams]);
 
   // 使用 useCallback 缓存处理函数
   const processAndUpdateImage = useCallback(async () => {
+    console.log(`[ProcessNode ${data.id}] 检查处理条件`);
+    console.log(`- 输入图像: ${inputImage ? '有' : '无'}`);
+    console.log(`- 节点参数: ${nodeParams ? '有' : '无'}`);
+    console.log(`- 节点类型: ${data.type}`);
+    console.log('data', data);
     if (!inputImage || !nodeParams) {
+      console.log(`[ProcessNode ${data.id}] 跳过处理：无输入图像或参数`);
       setImage(data.id, '');
       return;
     }
@@ -102,11 +121,11 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
     try {
       console.log(`[ProcessNode ${data.id}] 开始处理图像，类型: ${data.type}`);
       const params = nodeParams[data.type] || {};
-      console.log(`[ProcessNode ${data.id}] 处理参数:`, params);
+      console.log(`[ProcessNode ${data.id}] 处理参数:`, JSON.stringify(params, null, 2));
       
       const processed = await processImage(data.type, inputImage, params);
+      console.log(`[ProcessNode ${data.id}] 图像处理完成，更新输出`);
       setImage(data.id, processed);
-      console.log(`[ProcessNode ${data.id}] 图像处理完成`);
     } catch (error) {
       console.error(`[ProcessNode ${data.id}] 处理错误:`, error);
       setImage(data.id, '');
@@ -115,17 +134,27 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
 
   // 当输入图像或参数改变时处理图像
   useEffect(() => {
+    console.log(`[ProcessNode ${data.id}] 检测到变化`);
+    console.log('data', data);
+    console.log(`- 输入图像: ${inputImage ? '有' : '无'}`);
+    console.log(`- 节点参数: ${nodeParams ? '有' : '无'}`);
+    
     if (!inputImage) {
+      console.log(`[ProcessNode ${data.id}] 无输入图像，清除输出`);
       setImage(data.id, '');
       return;
     }
 
     const timer = setTimeout(() => {
+      console.log(`[Timer ProcessNode ${data.id}] 开始延迟处理`);
       processAndUpdateImage();
     }, 100);
 
-    return () => clearTimeout(timer);
-  }, [data.id, inputImage, processAndUpdateImage, setImage]);
+    return () => {
+      console.log(`[ProcessNode ${data.id}] 清理定时器`);
+      clearTimeout(timer);
+    };
+  }, [data.id, inputImage, nodeParams, processAndUpdateImage, setImage]);
 
   return (
     <div className={`px-4 py-2 rounded border border-gray-200 bg-white font-medium shadow-sm ${className || ''}`}>

@@ -42,4 +42,25 @@ html, body, #root {
 
 .output-node {
   border-color: #ffc107;
+}
+
+.react-flow__node.selected {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px #3b82f6 !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6 !important;
+  stroke-width: 3px !important;
+}
+
+.react-flow__edge.animated path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
 } 

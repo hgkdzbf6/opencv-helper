@@ -31,10 +31,21 @@ import ResizablePanel from './ResizablePanel';
 import { useImageStore } from '../store/imageStore';
 import { saveFlow, SaveOption, loadFlow } from '../utils/flowUtils';
 
-const nodeTypes: NodeTypes = {
-  input: InputNode,
-  output: OutputNode,
-  process: ProcessNode,
+const nodeTypes = {
+  'input': InputNode,
+  'process': ProcessNode,
+  'output': OutputNode,
+  'draw-rect': ProcessNode,
+  'draw-circle': ProcessNode,
+  'draw-line': ProcessNode,
+  'binary': ProcessNode,
+  'blur': ProcessNode,
+  'erode': ProcessNode,
+  'dilate': ProcessNode,
+  'edge': ProcessNode,
+  'mask': ProcessNode,
+  'invert-mask': ProcessNode,
+  'blank': InputNode
 };
 
 let id = 1; // 从1开始编号
@@ -55,6 +66,21 @@ const defaultEdgeOptions = {
   markerEnd: {
     type: MarkerType.ArrowClosed,
     color: '#374151',
+  },
+};
+
+// 添加选择样式
+const edgeStyles = {
+  selected: {
+    stroke: '#2196f3',
+    strokeWidth: 3,
+  },
+};
+
+const nodeStyles = {
+  selected: {
+    borderColor: '#2196f3',
+    boxShadow: '0 0 0 2px #2196f3',
   },
 };
 
@@ -134,9 +160,12 @@ const Flow = () => {
         id: nodeId,
         type: node.type,
         position,
-        data: node.type === 'process' 
-          ? { id: nodeId, type: node.processType, label: node.label }
-          : { id: nodeId },
+        data: {
+          id: nodeId,
+          label: node.label,
+          processType: node.type,
+          type: node.type
+        }
       };
 
       setNodes((nds) => nds.concat(newNode));
@@ -144,19 +173,22 @@ const Flow = () => {
     [reactFlowInstance],
   );
 
-  const onNodeAdd = useCallback(
-    (type: string, position: { x: number; y: number }, data?: any) => {
-      const nodeId = getId();
-      const newNode = {
+  const onNodeAdd = useCallback((type: string, position: { x: number; y: number }, data?: any) => {
+    console.log('data', data);
+    const nodeId = getId();
+    const newNode = {
+      id: nodeId,
+      type: type,
+      position,
+      data: {
         id: nodeId,
-        type,
-        position,
-        data: data || { id: nodeId },
-      };
-      setNodes((nds) => nds.concat(newNode));
-    },
-    [],
-  );
+        label: data?.label || type,
+        type: data?.type
+      }
+    };
+
+    setNodes((nds) => nds.concat(newNode));
+  }, [setNodes]);
 
   const showSaveModal = () => {
     if (nodes.length === 0) {
@@ -228,6 +260,7 @@ const Flow = () => {
           onDrop={onDrop}
           nodeTypes={nodeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
+          className="[&_.selected]:!border-blue-500 [&_.selected]:!shadow-[0_0_0_2px_#3b82f6] [&_.selected]:!stroke-blue-500 [&_.selected]:!stroke-[3px]"
           fitView
         >
           <Controls />
@@ -269,6 +302,7 @@ const Flow = () => {
           selectedNode={selectedNode}
           nodes={nodes}
           edges={edges}
+          onNodeAdd={onNodeAdd}
         />
       </ResizablePanel>
 

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import Draggable, { DraggableEventHandler } from 'react-draggable';
-import { Button } from 'antd';
+import React, { useRef, useState, useEffect } from 'react';
 import { Node, Edge } from 'reactflow';
+import Draggable from 'react-draggable';
+import { Button } from 'antd';
 import { useImageStore } from '../store/imageStore';
 
 interface DebugPanelProps {
@@ -10,27 +10,10 @@ interface DebugPanelProps {
   edges: Edge[];
 }
 
-const DebugPanel = ({ logs, nodes, edges }: DebugPanelProps) => {
+const DebugPanel: React.FC<DebugPanelProps> = ({ logs, nodes, edges }) => {
+  const nodeRef = useRef<HTMLDivElement>(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const panelRef = useRef<HTMLDivElement>(null);
   const { images, getConnectedNodeImage } = useImageStore();
-
-  useEffect(() => {
-    // 初始化面板位置到右下角
-    if (panelRef.current) {
-      const { innerWidth, innerHeight } = window;
-      const { offsetWidth, offsetHeight } = panelRef.current;
-      setPosition({
-        x: innerWidth - offsetWidth - 20,
-        y: innerHeight - offsetHeight - 20,
-      });
-    }
-  }, []);
-
-  const handleDragStop: DraggableEventHandler = (e, data) => {
-    setPosition({ x: data.x, y: data.y });
-  };
 
   const debugFlow = () => {
     console.group('流程图调试信息');
@@ -50,43 +33,36 @@ const DebugPanel = ({ logs, nodes, edges }: DebugPanelProps) => {
 
   return (
     <Draggable
-      position={position}
-      onStop={handleDragStop}
-      bounds="parent"
-      handle=".debug-panel-header"
+      nodeRef={nodeRef}
+      defaultPosition={{ x: 20, y: window.innerHeight - 300 }}
+      handle=".debug-panel-handle"
     >
       <div
-        ref={panelRef}
-        className={`fixed bg-white shadow-lg rounded-lg overflow-hidden transition-all duration-200 ${
-          isMinimized ? 'w-48' : 'w-96'
-        }`}
+        ref={nodeRef}
+        className="absolute bg-white rounded-lg shadow-lg border border-gray-200 w-[300px]"
         style={{ zIndex: 1000 }}
       >
-        <div className="debug-panel-header bg-gray-800 text-white px-4 py-2 cursor-move flex justify-between items-center">
-          <span>调试面板</span>
-          <button
-            onClick={() => setIsMinimized(!isMinimized)}
-            className="text-white hover:text-gray-300 focus:outline-none"
-          >
-            {isMinimized ? '展开' : '收起'}
-          </button>
+        <div className="debug-panel-handle p-2 bg-gray-100 rounded-t-lg cursor-move flex justify-between items-center">
+          <span className="font-medium">调试面板</span>
+          <div className="flex items-center gap-2">
+            <Button size="small" onClick={debugFlow}>调试</Button>
+            <Button 
+              size="small" 
+              onClick={() => setIsMinimized(!isMinimized)}
+            >
+              {isMinimized ? '展开' : '收起'}
+            </Button>
+          </div>
         </div>
         {!isMinimized && (
-          <div className="p-4 max-h-96 overflow-y-auto">
-            <Button onClick={debugFlow} type="primary" block className="mb-4">
-              调试数据流
-            </Button>
-            {logs.length === 0 ? (
-              <div className="text-gray-500 text-center">暂无日志</div>
-            ) : (
-              logs.map((log, index) => (
-                <div
-                  key={index}
-                  className="mb-2 p-2 bg-gray-50 rounded text-sm font-mono whitespace-pre-wrap"
-                >
-                  {log}
-                </div>
-              ))
+          <div className="p-2 max-h-[200px] overflow-y-auto">
+            {logs.map((log, index) => (
+              <div key={index} className="text-xs mb-1 font-mono">
+                {log}
+              </div>
+            ))}
+            {logs.length === 0 && (
+              <div className="text-gray-400 text-center text-sm">暂无日志</div>
             )}
           </div>
         )}
