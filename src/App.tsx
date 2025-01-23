@@ -1,7 +1,9 @@
 import { ReactFlowProvider } from 'reactflow';
+import 'reactflow/dist/style.css';
+import './App.css';
 import Flow from './components/Flow';
 
-function App() {
+const App = () => {
   return (
     <div className="w-full h-full">
       <ReactFlowProvider>
@@ -9,6 +11,6 @@ function App() {
       </ReactFlowProvider>
     </div>
   );
-}
+};
 
 export default App;

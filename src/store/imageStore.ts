@@ -5,14 +5,14 @@ export interface NodeParams {
   [key: string]: {
     threshold?: number;
     maxValue?: number;
-    method?: string;
+    method?: 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
     useOtsu?: boolean;
     kernelSize?: number;
     sigmaX?: number;
     sigmaY?: number;
-    borderType?: string;
+    borderType?: 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
     iterations?: number;
-    kernelShape?: string;
+    kernelShape?: 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
     anchor?: { x: number; y: number };
     threshold1?: number;
     threshold2?: number;
@@ -26,7 +26,7 @@ export interface NodeParams {
     radius?: number;
     color?: [number, number, number];
     thickness?: number;
-    lineType?: string;
+    lineType?: 'LINE_4' | 'LINE_8' | 'LINE_AA';
     filled?: boolean;
     x1?: number;
     y1?: number;
@@ -74,12 +74,17 @@ export const useImageStore = create<ImageState>((set, get) => ({
 
   getConnectedNodeImage: (nodeId: string) => {
     const state = get();
-    const sourceNodeId = state.edges.find(edge => edge.target === nodeId)?.source;
-    return sourceNodeId ? state.images[sourceNodeId] : undefined;
+    const edge = state.edges.find(edge => edge.target === nodeId);
+    if (!edge) {
+      return undefined;
+    }
+    return state.images[edge.source];
   },
 
   toggleNodesPreview: () => {
-    set((state) => ({ showNodesPreview: !state.showNodesPreview }));
+    set((state) => ({ 
+      showNodesPreview: !state.showNodesPreview 
+    }));
   },
 
   setNodeParams: (nodeId: string, params: NodeParams) => {

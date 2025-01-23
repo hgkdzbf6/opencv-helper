@@ -1,0 +1,45 @@
+/* 基础样式 */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.react-flow {
+  background-color: #f8f9fa;
+}
+
+.react-flow__node {
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background-color: #555;
+  border: 2px solid white;
+}
+
+.react-flow__edge {
+  stroke: #555;
+  stroke-width: 2;
+}
+
+/* 自定义节点样式 */
+.input-node {
+  border-color: #61dafb;
+}
+
+.process-node {
+  border-color: #20c997;
+}
+
+.output-node {
+  border-color: #ffc107;
+} 
