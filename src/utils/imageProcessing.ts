@@ -1,21 +1,37 @@
-// 定义处理参数类型
+// 定义参数类型
+type ThresholdMethod = 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
+type BorderType = 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
+type KernelShape = 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
+type LineType = 'LINE_4' | 'LINE_8' | 'LINE_AA';
+
 interface ProcessParams {
+  // 二值化参数
   threshold?: number;
   maxValue?: number;
-  method?: string;
+  method?: ThresholdMethod;
   useOtsu?: boolean;
+
+  // 模糊参数
   kernelSize?: number;
   sigmaX?: number;
   sigmaY?: number;
-  borderType?: string;
+  borderType?: BorderType;
+
+  // 形态学操作参数
   iterations?: number;
-  kernelShape?: string;
+  kernelShape?: KernelShape;
   anchor?: { x: number; y: number };
+
+  // 边缘检测参数
   threshold1?: number;
   threshold2?: number;
-  apertureSize?: string;
+  apertureSize?: number;
   l2gradient?: boolean;
+
+  // 蒙版参数
   blendAlpha?: number;
+
+  // 绘图参数
   x?: number;
   y?: number;
   width?: number;
@@ -23,7 +39,7 @@ interface ProcessParams {
   radius?: number;
   color?: [number, number, number];
   thickness?: number;
-  lineType?: string;
+  lineType?: LineType;
   filled?: boolean;
   x1?: number;
   y1?: number;
@@ -43,7 +59,8 @@ export const processImage = async (type: string, imageData: string, params: Proc
     // 确保 imageData 是 base64 格式
     const base64Image = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
 
-    const my_data = {
+    // 构造请求数据
+    const requestData = {
       type,
       image: base64Image,
       params: {
@@ -54,16 +71,27 @@ export const processImage = async (type: string, imageData: string, params: Proc
         iterations: params.iterations ? Number(params.iterations) : undefined,
         threshold1: params.threshold1 ? Number(params.threshold1) : undefined,
         threshold2: params.threshold2 ? Number(params.threshold2) : undefined,
+        x: params.x ? Number(params.x) : undefined,
+        y: params.y ? Number(params.y) : undefined,
+        width: params.width ? Number(params.width) : undefined,
+        height: params.height ? Number(params.height) : undefined,
+        radius: params.radius ? Number(params.radius) : undefined,
+        x1: params.x1 ? Number(params.x1) : undefined,
+        y1: params.y1 ? Number(params.y1) : undefined,
+        x2: params.x2 ? Number(params.x2) : undefined,
+        y2: params.y2 ? Number(params.y2) : undefined,
       },
-    }
-    console.log(my_data);
+    };
+
+    console.log('发送请求数据:', requestData);
+
     const response = await fetch(`${API_BASE_URL}/process`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify(my_data),
+      body: JSON.stringify(requestData),
     });
 
     if (!response.ok) {

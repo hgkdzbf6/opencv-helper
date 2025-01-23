@@ -12,86 +12,125 @@ interface PropertiesPanelProps {
   edges: Edge[];
 }
 
+type ThresholdMethod = 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
+type BorderType = 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
+type KernelShape = 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
+type LineType = 'LINE_4' | 'LINE_8' | 'LINE_AA';
+
+interface NodeTypeParams {
+  threshold?: number;
+  maxValue?: number;
+  method?: ThresholdMethod;
+  useOtsu?: boolean;
+  kernelSize?: number;
+  sigmaX?: number;
+  sigmaY?: number;
+  borderType?: BorderType;
+  iterations?: number;
+  kernelShape?: KernelShape;
+  anchorX?: number;
+  anchorY?: number;
+  threshold1?: number;
+  threshold2?: number;
+  apertureSize?: number;
+  l2gradient?: boolean;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  radius?: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  color?: [number, number, number];
+  thickness?: number;
+  lineType?: LineType;
+  filled?: boolean;
+}
+
+interface NodeParams {
+  [key: string]: NodeTypeParams;
+}
+
+type ParamKey = keyof NodeTypeParams;
+
+interface SelectOption<T extends string> {
+  value: T;
+  label: string;
+}
+
 const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => {
   const setNodeParams = useImageStore((state) => state.setNodeParams);
   const nodeParams = useImageStore((state) => state.getNodeParams(nodeId));
+  const currentParams = (nodeParams?.[type] || {}) as NodeTypeParams;
 
-  const onParamChange = (paramName: string, value: any) => {
-    const currentParams = nodeParams?.[type] || {};
-    setNodeParams(nodeId, { [type]: { ...currentParams, [paramName]: value } });
+  const onParamChange = (key: ParamKey, value: NodeTypeParams[ParamKey]) => {
+    setNodeParams(nodeId, { [type]: { ...currentParams, [key]: value } });
   };
 
-  const renderSlider = (
-    label: string,
-    paramName: string,
-    min: number,
-    max: number,
-    step: number = 1,
-    defaultValue: number
-  ) => (
+  const renderSlider = (label: string, key: ParamKey, min: number, max: number, step: number, defaultValue: number) => (
     <div className="mb-4">
-      <div className="font-medium mb-2">{label}</div>
+      <div className="mb-2">{label}</div>
       <Slider
         min={min}
         max={max}
         step={step}
-        value={nodeParams?.[type]?.[paramName] ?? defaultValue}
-        onChange={(value) => onParamChange(paramName, value)}
+        value={(currentParams[key] as number) ?? defaultValue}
+        onChange={(value) => onParamChange(key, value)}
       />
     </div>
   );
 
-  const renderSelect = (
+  const renderSelect = <T extends ThresholdMethod | BorderType | KernelShape | LineType>(
     label: string,
-    paramName: string,
-    options: { value: string; label: string }[],
-    defaultValue: string
+    key: ParamKey,
+    options: SelectOption<T>[],
+    defaultValue: T
   ) => (
     <div className="mb-4">
-      <div className="font-medium mb-2">{label}</div>
+      <div className="mb-2">{label}</div>
       <Select
+        value={(currentParams[key] as T) ?? defaultValue}
+        onChange={(value: T) => onParamChange(key, value)}
         style={{ width: '100%' }}
-        value={nodeParams?.[type]?.[paramName] ?? defaultValue}
-        onChange={(value) => onParamChange(paramName, value)}
-        options={options}
-      />
+      >
+        {options.map(option => (
+          <Select.Option key={option.value} value={option.value}>
+            {option.label}
+          </Select.Option>
+        ))}
+      </Select>
     </div>
   );
 
-  const renderSwitch = (
-    label: string,
-    paramName: string,
-    defaultValue: boolean
-  ) => (
-    <div className="mb-4 flex justify-between items-center">
+  const renderSwitch = (label: string, key: ParamKey, defaultValue: boolean) => (
+    <div className="mb-4 flex items-center justify-between">
       <span>{label}</span>
       <Switch
-        checked={nodeParams?.[type]?.[paramName] ?? defaultValue}
-        onChange={(checked) => onParamChange(paramName, checked)}
+        checked={(currentParams[key] as boolean) ?? defaultValue}
+        onChange={(checked) => onParamChange(key, checked)}
       />
     </div>
   );
 
-  const renderColorPicker = (
-    label: string,
-    paramName: string,
-    defaultValue: [number, number, number]
-  ) => (
+  const renderColorPicker = (label: string, key: ParamKey, defaultValue: [number, number, number]) => (
     <div className="mb-4">
-      <div className="font-medium mb-2">{label}</div>
+      <div className="mb-2">{label}</div>
       <div className="flex gap-2">
         {['R', 'G', 'B'].map((channel, index) => (
           <div key={channel} className="flex-1">
-            <div className="text-xs text-gray-500 mb-1">{channel}</div>
+            <div className="text-xs mb-1">{channel}</div>
             <InputNumber
               min={0}
               max={255}
-              value={nodeParams?.[type]?.[paramName]?.[index] ?? defaultValue[index]}
+              value={((currentParams[key] as [number, number, number]) ?? defaultValue)[index]}
               onChange={(value) => {
-                const currentColor = [...(nodeParams?.[type]?.[paramName] ?? defaultValue)];
-                currentColor[index] = value ?? defaultValue[index];
-                onParamChange(paramName, currentColor);
+                const newColor = [...((currentParams[key] as [number, number, number]) ?? defaultValue)];
+                newColor[index] = value ?? 0;
+                onParamChange(key, newColor as [number, number, number]);
               }}
+              style={{ width: '100%' }}
             />
           </div>
         ))}
@@ -105,7 +144,7 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
         <div className="mt-4">
           {renderSlider('阈值', 'threshold', 0, 255, 1, 128)}
           {renderSlider('最大值', 'maxValue', 0, 255, 1, 255)}
-          {renderSelect('二值化方法', 'method', [
+          {renderSelect<ThresholdMethod>('二值化方法', 'method', [
             { value: 'THRESH_BINARY', label: '二值化' },
             { value: 'THRESH_BINARY_INV', label: '反二值化' },
             { value: 'THRESH_TRUNC', label: '截断' },
@@ -122,7 +161,7 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
           {renderSlider('核大小', 'kernelSize', 3, 25, 2, 5)}
           {renderSlider('X方向标准差', 'sigmaX', 0, 10, 0.1, 0)}
           {renderSlider('Y方向标准差', 'sigmaY', 0, 10, 0.1, 0)}
-          {renderSelect('边界类型', 'borderType', [
+          {renderSelect<BorderType>('边界类型', 'borderType', [
             { value: 'BORDER_DEFAULT', label: '默认' },
             { value: 'BORDER_CONSTANT', label: '常数' },
             { value: 'BORDER_REPLICATE', label: '复制' },
@@ -136,13 +175,13 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
         <div className="mt-4">
           {renderSlider('核大小', 'kernelSize', 3, 25, 2, 3)}
           {renderSlider('迭代次数', 'iterations', 1, 10, 1, 1)}
-          {renderSelect('核形状', 'kernelShape', [
+          {renderSelect<KernelShape>('核形状', 'kernelShape', [
             { value: 'MORPH_RECT', label: '矩形' },
             { value: 'MORPH_CROSS', label: '十字形' },
             { value: 'MORPH_ELLIPSE', label: '椭圆形' },
           ], 'MORPH_RECT')}
-          {renderSlider('锚点 X', 'anchor.x', -1, 1, 1, -1)}
-          {renderSlider('锚点 Y', 'anchor.y', -1, 1, 1, -1)}
+          {renderSlider('锚点 X', 'anchorX', -1, 1, 1, -1)}
+          {renderSlider('锚点 Y', 'anchorY', -1, 1, 1, -1)}
         </div>
       );
 
@@ -151,47 +190,38 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
         <div className="mt-4">
           {renderSlider('阈值1', 'threshold1', 0, 255, 1, 100)}
           {renderSlider('阈值2', 'threshold2', 0, 255, 1, 200)}
-          {renderSelect('孔径大小', 'apertureSize', [
-            { value: '3', label: '3x3' },
-            { value: '5', label: '5x5' },
-            { value: '7', label: '7x7' },
-          ], '3')}
+          {renderSlider('孔径大小', 'apertureSize', 3, 7, 2, 3)}
           {renderSwitch('使用 L2 梯度', 'l2gradient', false)}
         </div>
       );
 
-    case 'mask':
-    case 'invert-mask':
+    case 'draw-rect':
       return (
         <div className="mt-4">
-          {renderSlider('阈值', 'threshold', 0, 255, 1, 128)}
-          {renderSlider('最大值', 'maxValue', 0, 255, 1, 255)}
-          {renderSelect('方法', 'method', [
-            { value: 'THRESH_BINARY', label: '二值化' },
-            { value: 'THRESH_BINARY_INV', label: '反二值化' },
-          ], 'THRESH_BINARY')}
-          {renderSlider('混合透明度', 'blendAlpha', 0, 1, 0.1, 0.5)}
+          {renderSlider('X 坐标', 'x', 0, 1000, 1, 0)}
+          {renderSlider('Y 坐标', 'y', 0, 1000, 1, 0)}
+          {renderSlider('宽度', 'width', 1, 1000, 1, 100)}
+          {renderSlider('高度', 'height', 1, 1000, 1, 100)}
+          {renderColorPicker('颜色', 'color', [255, 0, 0])}
+          {renderSlider('线条粗细', 'thickness', 1, 10, 1, 2)}
+          {renderSelect<LineType>('线条类型', 'lineType', [
+            { value: 'LINE_4', label: '4连通' },
+            { value: 'LINE_8', label: '8连通' },
+            { value: 'LINE_AA', label: '抗锯齿' },
+          ], 'LINE_8')}
+          {renderSwitch('填充', 'filled', false)}
         </div>
       );
 
-    case 'draw-rect':
     case 'draw-circle':
-      const isRect = type === 'draw-rect';
       return (
         <div className="mt-4">
-          {renderSlider('X 坐标', 'x', 0, 1000, 1, isRect ? 0 : 50)}
-          {renderSlider('Y 坐标', 'y', 0, 1000, 1, isRect ? 0 : 50)}
-          {isRect ? (
-            <>
-              {renderSlider('宽度', 'width', 0, 1000, 1, 100)}
-              {renderSlider('高度', 'height', 0, 1000, 1, 100)}
-            </>
-          ) : (
-            renderSlider('半径', 'radius', 0, 500, 1, 25)
-          )}
-          {renderColorPicker('颜色', 'color', isRect ? [255, 0, 0] : [0, 255, 0])}
-          {renderSlider('线条粗细', 'thickness', 1, 20, 1, 2)}
-          {renderSelect('线条类型', 'lineType', [
+          {renderSlider('X 坐标', 'x', 0, 1000, 1, 50)}
+          {renderSlider('Y 坐标', 'y', 0, 1000, 1, 50)}
+          {renderSlider('半径', 'radius', 1, 500, 1, 25)}
+          {renderColorPicker('颜色', 'color', [0, 255, 0])}
+          {renderSlider('线条粗细', 'thickness', 1, 10, 1, 2)}
+          {renderSelect<LineType>('线条类型', 'lineType', [
             { value: 'LINE_4', label: '4连通' },
             { value: 'LINE_8', label: '8连通' },
             { value: 'LINE_AA', label: '抗锯齿' },
@@ -208,8 +238,8 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
           {renderSlider('终点 X', 'x2', 0, 1000, 1, 100)}
           {renderSlider('终点 Y', 'y2', 0, 1000, 1, 100)}
           {renderColorPicker('颜色', 'color', [0, 0, 255])}
-          {renderSlider('线条粗细', 'thickness', 1, 20, 1, 2)}
-          {renderSelect('线条类型', 'lineType', [
+          {renderSlider('线条粗细', 'thickness', 1, 10, 1, 2)}
+          {renderSelect<LineType>('线条类型', 'lineType', [
             { value: 'LINE_4', label: '4连通' },
             { value: 'LINE_8', label: '8连通' },
             { value: 'LINE_AA', label: '抗锯齿' },
