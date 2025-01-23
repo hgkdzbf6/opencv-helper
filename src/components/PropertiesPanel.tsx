@@ -448,6 +448,7 @@ const CodeGeneratorPanel = ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) 
 
 const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPanelProps) => {
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [drawingImage, setDrawingImage] = useState<string | undefined>(undefined);
   const setImage = useImageStore((state) => state.setImage);
   const getImage = useImageStore((state) => state.getImage);
   const getConnectedImage = useImageStore((state) => state.getConnectedNodeSourceImage);
@@ -512,12 +513,13 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
     setIsDrawingMode(false);
   }, [selectedNode, nodeParams, setNodeParams]);
 
-  const handlePreviewClick = useCallback(() => {
+  const handlePreviewClick = useCallback((image: string) => {
     if (selectedNode?.type === 'process' && 
         (selectedNode.data.processType === 'draw-rect' || selectedNode.data.processType === 'draw-circle' || selectedNode.data.processType === 'draw-line')) {
       setIsDrawingMode(true);
     }
     setPreviewVisible(true);
+    setDrawingImage(image);
   }, [selectedNode]);
 
   const handleToolChange = (value: string) => {
@@ -695,18 +697,18 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
         styles={{ body: { padding: 0 } }}
       >
         <div className="w-full h-[80vh] bg-gray-50 flex items-center justify-center">
-          {(backgroundImage || inputImage) && (
+          {(backgroundImage || drawingImage) && (
             isDrawingMode ? (
               <DrawingCanvas 
                 visible={isDrawingMode}
                 onClose={() => setIsDrawingMode(false)}
                 onComplete={handleDrawComplete}
                 type={drawingTool}
-                initialImage={backgroundImage || inputImage}
+                initialImage={backgroundImage || drawingImage}
               />
             ) : (
               <img 
-                src={backgroundImage || inputImage} 
+                src={backgroundImage || drawingImage} 
                 alt="大图预览" 
                 className="max-w-full max-h-full object-contain"
               />
