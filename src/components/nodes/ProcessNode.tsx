@@ -229,13 +229,15 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
         style={{ background: '#555' }}
         onConnect={(params) => console.log('handle onConnect', params)}
       />
-      <div className="p-2">
+
+
+      <div className="w-[100px] h-[100px] bg-gray-50 rounded overflow-hidden">
         <div className="text-sm font-medium mb-2">{data.label}</div>
         {data.processType === 'print' && inputData ? (
           <div className="text-xs whitespace-pre-wrap overflow-auto max-h-[200px]">
             {typeof inputData === 'object' ? (
               <>
-                {inputData.image && (
+                {inputData && inputData.image && (
                   <div className="mb-2">
                     <img src={`${inputData.image}`} alt="输入图像" className="max-w-full" />
                   </div>

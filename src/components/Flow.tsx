@@ -219,8 +219,8 @@ const Flow = () => {
       setStoreEdges(flowData.edges);
 
       // 恢复图片和参数
-      Object.entries(flowData.data_dict).forEach(([nodeId, imageData]) => {
-        setData(nodeId, imageData);
+      Object.entries(flowData.data_dict).forEach(([nodeId, data]) => {
+        setData(nodeId, data);
       });
       Object.entries(flowData.nodeParams).forEach(([nodeId, params]) => {
         setNodeParams(nodeId, params);
