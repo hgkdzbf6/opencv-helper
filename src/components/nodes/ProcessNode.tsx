@@ -8,7 +8,7 @@ interface ProcessNodeProps {
   data: {
     id: string;
     type: 'process' | 'input' | 'output';
-    processType: 'binary' | 'blur' | 'erode' | 'dilate' | 'edge' | 'mask' | 'invert-mask' | 'draw-rect' | 'draw-circle' | 'draw-line';
+    processType: 'binary' | 'blur' | 'erode' | 'dilate' | 'edge' | 'mask' | 'invert-mask' | 'draw-rect' | 'draw-circle' | 'draw-line' | 'multiply' | 'screen' | 'overlay' | 'blend';
     label: string;
   };
   className?: string;
@@ -17,11 +17,16 @@ interface ProcessNodeProps {
 const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   const setImage = useImageStore((state) => state.setImage);
   const getConnectedImage = useImageStore((state) => state.getConnectedNodeSourceImage);
+  const getSecondaryImage = useImageStore((state) => state.getConnectedNodeSecondaryImage);
   const inputImage = useImageStore((state) => state.getConnectedNodeSourceImage(data.id, true));
+  const secondaryImage = useImageStore((state) => state.getConnectedNodeSecondaryImage(data.id, true));
   const outputImage = useImageStore((state) => state.getImage(data.id, true));
   const setNodeParams = useImageStore((state) => state.setNodeParams);
   const nodeParams = useImageStore((state) => state.getNodeParams(data.id));
   const showNodesPreview = useImageStore((state) => state.showNodesPreview);
+
+  // 是否是混合模式节点
+  const isBlendNode = ['multiply', 'screen', 'overlay', 'blend'].includes(data.processType);
 
   // 初始化节点参数
   useEffect(() => {
@@ -96,6 +101,18 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
           color: [0, 0, 255] as [number, number, number],
           thickness: 2,
           lineType: 'LINE_8' as const
+        },
+        'multiply': {
+          opacity: 1.0
+        },
+        'screen': {
+          opacity: 1.0
+        },
+        'overlay': {
+          opacity: 1.0
+        },
+        'blend': {
+          ratio: 0.5
         }
       }[data.processType];
       
@@ -109,18 +126,24 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   const processAndUpdateImage = useCallback(async () => {
     console.log(`[ProcessNode ${data.id}] 检查处理条件`);
     console.log(`- 输入图像: ${inputImage ? '有' : '无'}`);
+    if (isBlendNode) {
+      console.log(`- 第二输入图像: ${secondaryImage ? '有' : '无'}`);
+    }
     console.log(`- 节点参数: ${nodeParams ? '有' : '无'}`);
     console.log(`- 节点类型: ${data.type}`);
-    console.log('data', data);
-    if (!inputImage || !nodeParams) {
-      console.log(`[ProcessNode ${data.id}] 跳过处理：无输入图像或参数`);
+    
+    if (!inputImage || (isBlendNode && !secondaryImage) || !nodeParams) {
+      console.log(`[ProcessNode ${data.id}] 跳过处理：缺少必要输入`);
       setImage(data.id, '');
       return;
     }
 
     try {
       console.log(`[ProcessNode ${data.id}] 开始处理图像，类型: ${data.type}，具体类型: ${data.processType}`);
-      const params = nodeParams[data.processType] || {};
+      const params = {
+        ...nodeParams[data.processType],
+        ...(isBlendNode ? { secondaryImage } : {})
+      };
       console.log(`[ProcessNode ${data.id}] 处理参数:`, JSON.stringify(params, null, 2));
       
       const processed = await processImage(data.processType, inputImage, params);
@@ -130,7 +153,7 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
       console.error(`[ProcessNode ${data.id}] 处理错误:`, error);
       setImage(data.id, '');
     }
-  }, [data.id, data.type, inputImage, nodeParams, setImage]);
+  }, [data.id, data.type, data.processType, inputImage, secondaryImage, nodeParams, setImage, isBlendNode]);
 
   // 当输入图像或参数改变时处理图像
   useEffect(() => {
@@ -159,6 +182,14 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   return (
     <div className={`px-4 py-2 rounded border border-gray-200 bg-white font-medium shadow-sm ${className || ''}`}>
       <Handle type="target" position={Position.Left} />
+      {isBlendNode && (
+        <Handle 
+          type="target" 
+          position={Position.Top} 
+          id="secondary"
+          style={{ top: 0 }}
+        />
+      )}
       <div className="flex flex-col items-center">
         <div className="mb-2">{data.label}</div>
         {showNodesPreview && outputImage && (

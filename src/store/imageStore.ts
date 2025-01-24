@@ -44,6 +44,7 @@ interface ImageState {
   getImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
   setEdges: (edges: Edge[]) => void;
   getConnectedNodeSourceImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
+  getConnectedNodeSecondaryImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
   toggleNodesPreview: () => void;
   setNodeParams: (nodeId: string, params: NodeParams) => void;
   getNodeParams: (nodeId: string) => NodeParams | undefined;
@@ -78,7 +79,17 @@ export const useImageStore = create<ImageState>((set, get) => ({
     if (!ignorePreviewSetting && !state.showNodesPreview) return undefined;
     
     const edges = state.edges;
-    const sourceEdge = edges.find(edge => edge.target === nodeId);
+    const sourceEdge = edges.find(edge => edge.target === nodeId && edge.targetHandle !== 'secondary');
+    if (!sourceEdge) return undefined;
+    return state.images[sourceEdge.source];
+  },
+
+  getConnectedNodeSecondaryImage: (nodeId: string, ignorePreviewSetting = false) => {
+    const state = get();
+    if (!ignorePreviewSetting && !state.showNodesPreview) return undefined;
+    
+    const edges = state.edges;
+    const sourceEdge = edges.find(edge => edge.target === nodeId && edge.targetHandle === 'secondary');
     if (!sourceEdge) return undefined;
     return state.images[sourceEdge.source];
   },

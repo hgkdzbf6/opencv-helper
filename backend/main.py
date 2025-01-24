@@ -116,6 +116,7 @@ async def process_image(request: ImageProcessRequest):
         
         # 根据类型处理图像
         print(f"开始处理图像: type={request.type}")
+        print(request)
         if request.type == "binary":
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             threshold = int(request.params.get("threshold", 128))
@@ -266,6 +267,61 @@ async def process_image(request: ImageProcessRequest):
             
             print(f"绘制直线: x1={x1}, y1={y1}, x2={x2}, y2={y2}, color={color}, thickness={thickness}, line_type={line_type}")
             cv2.line(result, (x1, y1), (x2, y2), color, thickness, line)
+            
+        elif request.type in ["multiply", "screen", "overlay", "blend"]:
+            # 获取第二张图片
+            secondary_image = request.params.get("secondaryImage")
+            if not secondary_image:
+                raise HTTPException(status_code=400, detail="未提供第二张图片")
+            
+            # 解码第二张图片
+            img2 = base64_to_cv2(secondary_image)
+            print(f"第二张图片解码成功: shape={img2.shape}")
+            # 确保两张图片大小相同
+            if img.shape != img2.shape:
+                img2 = cv2.resize(img2, (img.shape[1], img.shape[0]))
+            
+            # 根据不同的混合模式处理
+            if request.type == "multiply":
+                # 正片叠底
+                opacity = float(request.params.get("opacity", 1.0))
+                result = cv2.multiply(img, img2) / 255.0
+                result = np.clip(result, 0, 255).astype(np.float32)
+                img = img.astype(np.float32)
+                result = cv2.addWeighted(img, 1 - opacity, result, opacity, 0)
+                result = (result * 255).astype(np.uint8)
+                
+            elif request.type == "screen":
+                # 滤色
+                opacity = float(request.params.get("opacity", 1.0))
+                result = 255 - cv2.multiply(255 - img, 255 - img2) / 255.0
+                result = np.clip(result, 0, 255).astype(np.float32)
+                img = img.astype(np.float32)
+                result = cv2.addWeighted(img, 1 - opacity, result, opacity, 0)
+                result = result.astype(np.uint8)
+                print('滤色处理完成')
+            elif request.type == "overlay":
+                # 叠加
+                opacity = float(request.params.get("opacity", 1.0))
+                img = img.astype(float) / 255.0
+                img2 = img2.astype(float) / 255.0
+                
+                mask = img <= 0.5
+                result = np.zeros_like(img)
+                result[mask] = 2 * img[mask] * img2[mask]
+                result[~mask] = 1 - 2 * (1 - img[~mask]) * (1 - img2[~mask])
+                
+                img = img.astype(np.float32)
+                result = cv2.addWeighted(img, 1 - opacity, result, opacity, 0)
+                result = (result * 255).astype(np.uint8)
+                
+            elif request.type == "blend":
+                # 普通混合
+                ratio = float(request.params.get("ratio", 0.5))
+
+                img = img.astype(np.float32)
+                img2 = img2.astype(np.float32)
+                result = cv2.addWeighted(img, 1 - ratio, img2, ratio, 0)
             
         else:
             raise HTTPException(status_code=400, detail=f"不支持的处理类型: {request.type}")

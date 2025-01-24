@@ -48,6 +48,8 @@ interface NodeTypeParams {
   thickness?: number;
   lineType?: LineType;
   filled?: boolean;
+  opacity?: number;
+  ratio?: number;
 }
 
 interface NodeParams {
@@ -389,6 +391,22 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
             {renderSlider('阈值2', 'threshold2', 0, 255, 1, 200)}
             {renderSlider('孔径大小', 'apertureSize', 3, 7, 2, 3)}
             {renderSwitch('使用 L2 梯度', 'l2gradient', false)}
+          </div>
+        );
+
+      case 'multiply':
+      case 'screen':
+      case 'overlay':
+        return (
+          <div className="space-y-4">
+            {renderSlider('不透明度', 'opacity', 0, 1, 0.01, 1)}
+          </div>
+        );
+
+      case 'blend':
+        return (
+          <div className="space-y-4">
+            {renderSlider('混合比例', 'ratio', 0, 1, 0.01, 0.5)}
           </div>
         );
 

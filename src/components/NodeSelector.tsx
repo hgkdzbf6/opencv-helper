@@ -66,6 +66,15 @@ const nodeCategories: Record<string, NodeCategory> = {
       { type: 'process', processType: 'invert-mask', label: '🔄 反转蒙版', description: '反转蒙版的效果' }
     ]
   },
+  blend: {
+    title: '混合模式',
+    nodes: [
+      { type: 'process', processType: 'multiply', label: '✖️ 正片叠底', description: '将两个图层的颜色相乘' },
+      { type: 'process', processType: 'screen', label: '🔆 滤色', description: '将两个图层的颜色反相相乘' },
+      { type: 'process', processType: 'overlay', label: '📍 叠加', description: '根据底图颜色决定是正片叠底还是滤色' },
+      { type: 'process', processType: 'blend', label: '🔀 混合', description: '按不同比例混合两个图层' }
+    ]
+  },
   output: {
     title: '输出节点',
     nodes: [
