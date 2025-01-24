@@ -1,5 +1,5 @@
 import { Handle, Position } from 'reactflow';
-import { useImageStore } from '../../store/imageStore';
+import { useDataStore } from '../../store/imageStore';
 
 interface OutputNodeProps {
   id: string;
@@ -8,7 +8,7 @@ interface OutputNodeProps {
 }
 
 const OutputNode = ({ data, className }: OutputNodeProps) => {
-  const connectedImage = useImageStore((state) => state.getConnectedNodeSourceImage(data.id));
+  const connectedImage = useDataStore((state) => state.getConnectedNodeSourceData(data.id));
 
   return (
     <div className={`px-4 py-2 rounded border border-gray-200 bg-white font-medium shadow-sm ${className || ''}`}>
@@ -18,7 +18,7 @@ const OutputNode = ({ data, className }: OutputNodeProps) => {
         {connectedImage && (
           <div className="w-[100px] h-[100px] bg-gray-50 rounded overflow-hidden">
             <img 
-              src={connectedImage} 
+              src={connectedImage.image} 
               alt="输出" 
               className="w-full h-full object-contain"
             />

@@ -1,5 +1,5 @@
 import { Node, Edge } from 'reactflow';
-import { useImageStore } from '../store/imageStore';
+import { useDataStore } from '../store/imageStore';
 
 interface CodeGeneratorOptions {
   language: 'python' | 'cpp';

@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Node, Edge } from 'reactflow';
 import Draggable from 'react-draggable';
 import { Button } from 'antd';
-import { useImageStore } from '../store/imageStore';
+import { useDataStore } from '../store/imageStore';
 
 interface DebugPanelProps {
   logs: string[];
@@ -13,7 +13,7 @@ interface DebugPanelProps {
 const DebugPanel: React.FC<DebugPanelProps> = ({ logs, nodes, edges }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const { images, getConnectedNodeSourceImage: getConnectedNodeImage } = useImageStore();
+  const { data_dict: images, getConnectedNodeSourceData: getConnectedNodeImage } = useDataStore();
 
   const debugFlow = () => {
     console.group('流程图调试信息');

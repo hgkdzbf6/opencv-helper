@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { Handle, Position } from 'reactflow';
-import { useImageStore } from '../../store/imageStore';
+import { useDataStore } from '../../store/imageStore';
 import { processImage, ProcessParams, ContourMode, ContourMethod } from '../../utils/imageProcessing';
 
 interface ProcessNodeData {
@@ -16,15 +16,15 @@ interface ProcessNodeProps {
 }
 
 const ProcessNode = ({ data, className }: ProcessNodeProps) => {
-  const setImage = useImageStore((state) => state.setImage);
-  const getConnectedImage = useImageStore((state) => state.getConnectedNodeSourceImage);
-  const getSecondaryImage = useImageStore((state) => state.getConnectedNodeSecondaryImage);
-  const inputImage = useImageStore((state) => state.getConnectedNodeSourceImage(data.id, true));
-  const secondaryImage = useImageStore((state) => state.getConnectedNodeSecondaryImage(data.id, true));
-  const outputImage = useImageStore((state) => state.getImage(data.id, true));
-  const setNodeParams = useImageStore((state) => state.setNodeParams);
-  const nodeParams = useImageStore((state) => state.getNodeParams(data.id));
-  const showNodesPreview = useImageStore((state) => state.showNodesPreview);
+  const setData = useDataStore((state) => state.setData);
+  const getConnectedData = useDataStore((state) => state.getConnectedNodeSourceData);
+  const getSecondaryData = useDataStore((state) => state.getConnectedNodeSecondaryData);
+  const inputData = useDataStore((state) => state.getConnectedNodeSourceData(data.id, true));
+  const secondaryData = useDataStore((state) => state.getConnectedNodeSecondaryData(data.id, true));
+  const outputData = useDataStore((state) => state.getData(data.id, true));
+  const setNodeParams = useDataStore((state) => state.setNodeParams);
+  const nodeParams = useDataStore((state) => state.getNodeParams(data.id));
+  const showNodesPreview = useDataStore((state) => state.showNodesPreview);
 
   // 是否是混合模式节点
   const isBlendNode = ['multiply', 'screen', 'overlay', 'blend'].includes(data.processType);
@@ -142,39 +142,49 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   }, [data.id, data.type, data.processType, nodeParams, setNodeParams]);
 
   useEffect(() => {
-    if (!inputImage) return;
+    if (!inputData) return;
 
     const processParams = nodeParams?.[data.processType] || {};
     let outputImg: { image?: string; [key: string]: any } = {};
 
     const processAndUpdateImage = async () => {
       try {
+        // 确保输入图像是有效的 base64 字符串
+        const inputImageData = inputData.image || '';
+        if (!inputImageData) {
+          console.warn(`[ProcessNode ${data.id}] 输入图像为空`);
+          return;
+        }
+
         switch (data.processType) {
           case 'grayscale':
-            const grayResult = await processImage('grayscale', inputImage.image || '', {});
+            const grayResult = await processImage('grayscale', inputImageData, {});
             outputImg = { image: grayResult };
             break;
 
           case 'blank': {
-            const blankParams: ProcessParams = {
-              width: processParams.width || 512,
-              height: processParams.height || 512,
+            const blankParams = {
+              width: Number(processParams.width) || 512,
+              height: Number(processParams.height) || 512,
               color: processParams.color || [255, 255, 255],
-              isGrayscale: processParams.isGrayscale || false
-            };
-            const blankResult = await processImage('blank', inputImage.image || '', blankParams);
+              isGrayscale: Boolean(processParams.isGrayscale)
+            } as unknown as ProcessParams;
+            const blankResult = await processImage('blank', inputImageData, blankParams);
             outputImg = { image: blankResult };
             break;
           }
 
           case 'contour': {
-            const contourParams: ProcessParams = {
-              mode: processParams.mode || 'RETR_EXTERNAL',
-              contourMethod: processParams.contourMethod || 'CHAIN_APPROX_SIMPLE',
-              minArea: processParams.minArea || 100,
-              maxArea: processParams.maxArea || 10000
-            };
-            const contourResult = await processImage('contour', inputImage.image || '', contourParams);
+            // 先转换为灰度图
+            const grayImage = await processImage('grayscale', inputImageData, {});
+            // 再进行轮廓检测
+            const contourParams = {
+              mode: (processParams.mode || 'RETR_EXTERNAL') as ContourMode,
+              contourMethod: (processParams.contourMethod || 'CHAIN_APPROX_SIMPLE') as ContourMethod,
+              minArea: Number(processParams.minArea) || 100,
+              maxArea: Number(processParams.maxArea) || 10000
+            } as unknown as ProcessParams;
+            const contourResult = await processImage('contour', grayImage, contourParams);
             // contourResult 是一个 JSON 字符串，包含图像和轮廓数据
             const contourData = JSON.parse(contourResult);
             outputImg = contourData;
@@ -183,19 +193,20 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
 
           case 'print':
             // 打印节点直接传递输入数据
-            outputImg = inputImage;
+            outputImg = inputData;
             break;
 
           default:
-            const result = await processImage(data.processType, inputImage.image || '', processParams);
+            const result = await processImage(data.processType, inputImageData, processParams as ProcessParams);
+            console.log(`[processAndUpdateImage][ProcessNode ${data.id}] 处理结果:`, result);
             outputImg = { image: result };
         }
 
         console.log(`[ProcessNode ${data.id}] 图像处理完成，更新输出`);
-        setImage(data.id, outputImg);
+        setData(data.id, outputImg);
       } catch (error) {
         console.error(`[ProcessNode ${data.id}] 处理错误:`, error);
-        setImage(data.id, {});
+        setData(data.id, { error: error instanceof Error ? error.message : '处理失败' });
       }
     };
 
@@ -208,7 +219,7 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
       console.log(`[ProcessNode ${data.id}] 清理定时器`);
       clearTimeout(timer);
     };
-  }, [data.id, data.processType, inputImage, nodeParams, setImage]);
+  }, [data.id, data.processType, inputData, nodeParams, setData]);
 
   return (
     <div className="relative">
@@ -220,24 +231,26 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
       />
       <div className="p-2">
         <div className="text-sm font-medium mb-2">{data.label}</div>
-        {data.processType === 'print' && inputImage ? (
+        {data.processType === 'print' && inputData ? (
           <div className="text-xs whitespace-pre-wrap overflow-auto max-h-[200px]">
-            {typeof inputImage === 'object' ? (
+            {typeof inputData === 'object' ? (
               <>
-                {inputImage.image && (
+                {inputData.image && (
                   <div className="mb-2">
-                    <img src={`data:image/png;base64,${inputImage.image}`} alt="输入图像" className="max-w-full" />
+                    <img src={`${inputData.image}`} alt="输入图像" className="max-w-full" />
                   </div>
                 )}
-                <pre>{JSON.stringify(inputImage, null, 2)}</pre>
+                <pre>{JSON.stringify(inputData, null, 2)}</pre>
               </>
             ) : (
-              inputImage
+              inputData
             )}
           </div>
+        ) : outputData?.error ? (
+          <div className="text-xs text-red-500">{outputData.error}</div>
         ) : (
-          outputImage?.image && (
-            <img src={`data:image/png;base64,${outputImage.image}`} alt="处理后图像" className="max-w-full" />
+          outputData?.image && (
+            <img src={`${outputData.image}`} alt="处理后图像" className="max-w-full" />
           )
         )}
       </div>

@@ -1,5 +1,5 @@
 import { Handle, Position } from 'reactflow';
-import { useImageStore } from '../../store/imageStore';
+import { useDataStore } from '../../store/imageStore';
 
 interface InputNodeProps {
   id: string;
@@ -8,7 +8,7 @@ interface InputNodeProps {
 }
 
 const InputNode = ({ data, className }: InputNodeProps) => {
-  const image = useImageStore((state) => state.getImage(data.id));
+  const image = useDataStore((state) => state.getData(data.id));
 
   return (
     <div className={`px-4 py-2 rounded border border-gray-200 bg-white font-medium shadow-sm ${className || ''}`}>
@@ -18,7 +18,7 @@ const InputNode = ({ data, className }: InputNodeProps) => {
         {image && (
           <div className="w-[100px] h-[100px] bg-gray-50 rounded overflow-hidden">
             <img 
-              src={image} 
+              src={image.image} 
               alt="输入" 
               className="w-full h-full object-contain"
             />

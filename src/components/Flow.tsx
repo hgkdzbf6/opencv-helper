@@ -28,7 +28,7 @@ import PropertiesPanel from './PropertiesPanel';
 import NodeSelector from './NodeSelector';
 import DebugPanel from './DebugPanel';
 import ResizablePanel from './ResizablePanel';
-import { useImageStore } from '../store/imageStore';
+import { useDataStore } from '../store/imageStore';
 import { saveFlow, SaveOption, loadFlow } from '../utils/flowUtils';
 
 const nodeTypes = {
@@ -91,9 +91,9 @@ const Flow = () => {
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
-  const setStoreEdges = useImageStore((state) => state.setEdges);
-  const setImage = useImageStore((state) => state.setImage);
-  const setNodeParams = useImageStore((state) => state.setNodeParams);
+  const setStoreEdges = useDataStore((state) => state.setEdges);
+  const setData = useDataStore((state) => state.setData);
+  const setNodeParams = useDataStore((state) => state.setNodeParams);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [saveOption, setSaveOption] = useState<SaveOption>('all');
 
@@ -219,8 +219,8 @@ const Flow = () => {
       setStoreEdges(flowData.edges);
 
       // 恢复图片和参数
-      Object.entries(flowData.images).forEach(([nodeId, imageData]) => {
-        setImage(nodeId, imageData);
+      Object.entries(flowData.data_dict).forEach(([nodeId, imageData]) => {
+        setData(nodeId, imageData);
       });
       Object.entries(flowData.nodeParams).forEach(([nodeId, params]) => {
         setNodeParams(nodeId, params);
@@ -230,7 +230,7 @@ const Flow = () => {
     } catch (error) {
       message.error('加载失败: ' + (error as Error).message);
     }
-  }, [setNodes, setEdges, setStoreEdges, setImage, setNodeParams]);
+  }, [setNodes, setEdges, setStoreEdges, setData, setNodeParams]);
 
   const addLog = useCallback((message: string) => {
     setLogs((prevLogs) => [...prevLogs, `[${new Date().toLocaleTimeString()}] ${message}`]);

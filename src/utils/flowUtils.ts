@@ -1,34 +1,34 @@
 import { Node, Edge } from 'reactflow';
-import { useImageStore } from '../store/imageStore';
+import { useDataStore } from '../store/imageStore';
 
 interface FlowData {
   nodes: Node[];
   edges: Edge[];
-  images: Record<string, string>;
+  data_dict: Record<string, any>;
   nodeParams: Record<string, any>;
 }
 
 export type SaveOption = 'all' | 'input-only' | 'none';
 
 export const saveFlow = (nodes: Node[], edges: Edge[], saveOption: SaveOption = 'all') => {
-  const store = useImageStore.getState();
+  const store = useDataStore.getState();
   const flowData: FlowData = {
     nodes,
     edges,
-    images: {},
+    data_dict: {},
     nodeParams: store.nodeParams,
   };
 
   // 根据保存选项处理图片
   if (saveOption === 'all') {
-    flowData.images = store.images;
+    flowData.data_dict = store.data_dict;
   } else if (saveOption === 'input-only') {
     // 只保存输入节点的图片
     nodes.forEach(node => {
       if (node.type === 'input') {
-        const image = store.images[node.id];
-        if (image) {
-          flowData.images[node.id] = image;
+        const data = store.data_dict[node.id];
+        if (data) {
+          flowData.data_dict[node.id] = data;
         }
       }
     });

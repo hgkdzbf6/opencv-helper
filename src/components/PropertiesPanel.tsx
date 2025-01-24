@@ -1,9 +1,8 @@
 import { Node, Edge } from 'reactflow';
-import { useImageStore } from '../store/imageStore';
+import { useDataStore } from '../store/imageStore';
 import { UploadOutlined, CodeOutlined } from '@ant-design/icons';
 import { Button, Upload, Card, Slider, Switch, Modal, Tabs, message, Select, InputNumber, Radio } from 'antd';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { processImage } from '../utils/imageProcessing';
 import { generateCode } from '../utils/codeGenerator';
 
 interface PropertiesPanelProps {
@@ -224,9 +223,9 @@ const DrawingCanvas = ({ visible, onClose, onComplete, type, initialImage }: Dra
 
 const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => {
   const [isDrawingMode, setIsDrawingMode] = useState(false);
-  const setNodeParams = useImageStore((state) => state.setNodeParams);
-  const nodeParams = useImageStore((state) => state.getNodeParams(nodeId));
-  const inputImage = useImageStore((state) => state.getConnectedNodeSourceImage(nodeId, true));
+  const setNodeParams = useDataStore((state) => state.setNodeParams);
+  const nodeParams = useDataStore((state) => state.getNodeParams(nodeId));
+  const inputImage = useDataStore((state) => state.getConnectedNodeSourceData(nodeId, true));
   const currentParams = (nodeParams?.[type] || {}) as NodeTypeParams;
 
 
@@ -259,7 +258,7 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
     </div>
   );
 
-  const renderSelect = <T extends ThresholdMethod | BorderType | KernelShape | LineType>(
+  const renderSelect = <T extends  ThresholdMethod | BorderType | KernelShape | LineType | ContourMethod | ContourMode>(
     label: string,
     key: ParamKey,
     options: SelectOption<T>[],
@@ -368,7 +367,7 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
                 onClose={() => setIsDrawingMode(false)}
                 onComplete={handleDrawingComplete}
                 type={type}
-                initialImage={inputImage}
+                initialImage={inputImage?.image}
               />
             )}
           </div>
@@ -476,7 +475,7 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
         );
 
       case 'print':
-        const inputData = useImageStore.getState().getConnectedNodeSourceImage(nodeId, true);
+        const inputData = useDataStore.getState().getConnectedNodeSourceData(nodeId, true);
         return (
           <div>
             <div className="text-sm text-gray-500 mb-4">
@@ -484,7 +483,7 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
             </div>
             <div className="bg-gray-50 p-4 rounded">
               <pre className="whitespace-pre-wrap text-sm">
-                {inputData ? JSON.stringify(JSON.parse(inputData), null, 2) : '暂无数据'}
+                {inputData ? JSON.stringify(inputData, null, 2) : '暂无数据'}
               </pre>
             </div>
           </div>
@@ -504,7 +503,7 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
 
 const CodeGeneratorPanel = ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) => {
   const [code, setCode] = useState<string>('');
-  const nodeParams = useImageStore((state) => state.nodeParams);
+  const nodeParams = useDataStore((state) => state.nodeParams);
 
   // 使用 useCallback 来缓存函数
   const generateAndShowCode = useCallback((language: 'python' | 'cpp') => {
@@ -546,33 +545,27 @@ const CodeGeneratorPanel = ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) 
 const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPanelProps) => {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [inputOrOutput, setInputOrOutput] = useState<string | object | undefined>(undefined);
-  const setImage = useImageStore((state) => state.setImage);
-  const getImage = useImageStore((state) => state.getImage);
-  const getConnectedImage = useImageStore((state) => state.getConnectedNodeSourceImage);
-  const toggleNodesPreview = useImageStore((state) => state.toggleNodesPreview);
-  const showNodesPreview = useImageStore((state) => state.showNodesPreview);
-  const nodeParams = useImageStore((state) => state.getNodeParams);
-  const setNodeParams = useImageStore((state) => state.setNodeParams);
+  const setData = useDataStore((state) => state.setData);
+  const getData = useDataStore((state) => state.getData);
+  const getConnectedData = useDataStore((state) => state.getConnectedNodeSourceData);
+  const toggleNodesPreview = useDataStore((state) => state.toggleNodesPreview);
+  const showNodesPreview = useDataStore((state) => state.showNodesPreview);
+  const nodeParams = useDataStore((state) => state.getNodeParams);
+  const setNodeParams = useDataStore((state) => state.setNodeParams);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [drawingTool, setDrawingTool] = useState<'rect' | 'circle' | 'line'>('rect');
   const [selectedBackgroundNode, setSelectedBackgroundNode] = useState<string | undefined>();
 
-  const inputImage = useMemo(() => {
+  const inputData = useMemo(() => {
     if (!selectedNode) return undefined;
-    const img = getConnectedImage(selectedNode.id, true);
-    if (img && typeof img === 'object' && 'image' in img) {
-      return img.image;
-    }
-    if (img && typeof img === 'string') {
-      return img;
-    }
-    return undefined;
-  }, [selectedNode, getConnectedImage]);
+    const data = getConnectedData(selectedNode.id, true);
+    return data;
+  }, [selectedNode, getConnectedData]);
 
-  const outputImage = useMemo(() => {
+  const outputData = useMemo(() => {
     if (!selectedNode) return undefined;
-    return getImage(selectedNode.id, false);
-  }, [selectedNode, getImage]);
+    return getData(selectedNode.id, false);
+  }, [selectedNode, getData]);
 
   const getAvailableNodes = useMemo(() => {
     return nodes.filter(node => node.id !== selectedNode?.id && 
@@ -581,7 +574,7 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
 
   const backgroundImage = useMemo(() => {
     if (!selectedBackgroundNode) return undefined;
-    return useImageStore.getState().getImage(selectedBackgroundNode, true);
+    return useDataStore.getState().getData(selectedBackgroundNode, true);
   }, [selectedBackgroundNode]);
 
   const handleDrawComplete = useCallback((params: DrawingParams) => {
@@ -679,12 +672,12 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
       <Card title="输入图片预览" className="mb-4" size="small">
         <div 
           className="w-full bg-gray-50 rounded flex items-center justify-center overflow-hidden"
-          onClick={inputImage ? () => handlePreviewClick("input") : undefined}
-          style={{ cursor: inputImage ? 'pointer' : 'default' }}
+          onClick={inputData ? () => handlePreviewClick("input") : undefined}
+          style={{ cursor: inputData ? 'pointer' : 'default' }}
         >
-          {inputImage ? (
+          {inputData ? (
             <img 
-              src={inputImage} 
+              src={inputData.image} 
               alt="输入图像预览" 
               className="max-w-full max-h-full object-contain"
             />
@@ -702,14 +695,14 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
       <Card title="输出图片预览" className="mb-4" size="small">
         <div 
           className="w-full bg-gray-50 rounded flex items-center justify-center overflow-hidden"
-          onClick={outputImage ? () => {
+          onClick={outputData ? () => {
             handlePreviewClick("output");
           } : undefined}
-          style={{ cursor: outputImage ? 'pointer' : 'default' }}
+          style={{ cursor: outputData ? 'pointer' : 'default' }}
         >
-          {outputImage ? (
+          {outputData ? (
             <img 
-              src={outputImage} 
+              src={outputData.image} 
               alt="输出图像预览" 
               className="max-w-full max-h-full object-contain"
             />
@@ -730,7 +723,7 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
             reader.readAsDataURL(file);
             reader.onload = () => {
               if (typeof reader.result === 'string') {
-                setImage(selectedNode.data.id, reader.result);
+                setData(selectedNode.data.id, { image: reader.result });
               }
             };
             return false;
@@ -808,11 +801,11 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
                 onClose={() => setIsDrawingMode(false)}
                 onComplete={handleDrawComplete}
                 type={drawingTool}
-                initialImage={backgroundImage || (inputOrOutput === "output" ? outputImage : inputOrOutput === "input" ? inputImage : undefined)}
+                initialImage={backgroundImage?.image || (inputOrOutput === "output" ? outputData?.image : inputOrOutput === "input" ? inputData?.image : undefined)}
               />
             ) : (
               <img 
-                src={backgroundImage || (inputOrOutput === "output" ? outputImage : inputOrOutput === "input" ? inputImage : undefined)} 
+                src={backgroundImage?.image || (inputOrOutput === "output" ? outputData?.image : inputOrOutput === "input" ? inputData?.image : undefined)} 
                 alt="大图预览" 
                 className="max-w-full max-h-full object-contain"
               />
