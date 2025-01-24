@@ -61,6 +61,7 @@ export interface ProcessParams {
   blendMode?: 'multiply' | 'screen' | 'overlay' | 'blend';
   opacity?: number;
   ratio?: number;
+  secondaryImage?: string;
 
   // 允许任意其他参数
   [key: string]: any;
@@ -95,6 +96,7 @@ export const processImage = async (type: string, imageData: string, params: Proc
       y1: params.y1 ? Number(params.y1) : undefined,
       x2: params.x2 ? Number(params.x2) : undefined,
       y2: params.y2 ? Number(params.y2) : undefined,
+      image2: params.image2 ? params.image2 : undefined,
     }
 
     for (const key in send_params) {

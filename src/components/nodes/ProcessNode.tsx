@@ -26,8 +26,8 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
   const nodeParams = useDataStore((state) => state.getNodeParams(data.id));
   const showNodesPreview = useDataStore((state) => state.showNodesPreview);
 
-  // 是否是混合模式节点
-  const isBlendNode = ['multiply', 'screen', 'overlay', 'blend'].includes(data.processType);
+  // 是否是多输入节点
+  const isMultiInputNode = ['multiply', 'screen', 'overlay', 'blend'].includes(data.processType);
 
   // 初始化节点参数
   useEffect(() => {
@@ -156,6 +156,17 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
           return;
         }
 
+        // 对于混合模式节点，检查第二个输入
+        if (isMultiInputNode) {
+          if (!secondaryData?.image) {
+            console.warn(`[ProcessNode ${data.id}] 混合模式需要两个输入图像`);
+            setData(data.id, { error: '请连接第二个输入图像' });
+            return;
+          }
+          // 将第二个图像添加到处理参数中
+          processParams.secondaryImage = secondaryData.image;
+        }
+
         switch (data.processType) {
           case 'grayscale':
             const grayResult = await processImage('grayscale', inputImageData, {});
@@ -219,48 +230,62 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
       console.log(`[ProcessNode ${data.id}] 清理定时器`);
       clearTimeout(timer);
     };
-  }, [data.id, data.processType, inputData, nodeParams, setData]);
+  }, [data.id, data.processType, inputData, secondaryData, nodeParams, setData, isMultiInputNode]);
 
   return (
-    <div className="relative">
+    <div className={`px-4 py-2 rounded border border-gray-200 bg-white font-medium shadow-sm ${className || ''}`}>
+      {/* 主输入端点 */}
       <Handle
         type="target"
         position={Position.Left}
-        style={{ background: '#555' }}
-        onConnect={(params) => console.log('handle onConnect', params)}
+        style={{ left: '-8px', background: '#555' }}
       />
+      
+      {/* 第二输入端点（仅用于混合模式节点） */}
+      {isMultiInputNode && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="secondary"
+          style={{ left: '-8px', top: '75%', background: '#555' }}
+        />
+      )}
 
-
-      <div className="w-[100px] h-[100px] bg-gray-50 rounded overflow-hidden">
-        <div className="text-sm font-medium mb-2">{data.label}</div>
-        {data.processType === 'print' && inputData ? (
-          <div className="text-xs whitespace-pre-wrap overflow-auto max-h-[200px]">
-            {typeof inputData === 'object' ? (
-              <>
-                {inputData && inputData.image && (
-                  <div className="mb-2">
-                    <img src={`${inputData.image}`} alt="输入图像" className="max-w-full" />
-                  </div>
+      <div className="flex flex-col items-center">
+        <div className="mb-2">{data.label}</div>
+        {showNodesPreview && (
+          <div className="w-[100px] h-[100px] bg-gray-50 rounded overflow-hidden">
+            {data.processType === 'print' && inputData ? (
+              <div className="text-xs whitespace-pre-wrap overflow-auto max-h-[200px]">
+                {typeof inputData === 'object' ? (
+                  <>
+                    {inputData && (
+                      <div className="mb-2">
+                        <img src={`${inputData.image}`} alt="输入图像" className="max-w-full" />
+                      </div>
+                    )}
+                    <pre>{JSON.stringify(inputData, null, 2)}</pre>
+                  </>
+                ) : (
+                  inputData
                 )}
-                <pre>{JSON.stringify(inputData, null, 2)}</pre>
-              </>
+              </div>
+            ) : outputData?.error ? (
+              <div className="text-xs text-red-500">{outputData.error}</div>
             ) : (
-              inputData
+              outputData?.image && (
+                <img src={`${outputData.image}`} alt="处理后图像" className="w-full h-full object-contain" />
+              )
             )}
           </div>
-        ) : outputData?.error ? (
-          <div className="text-xs text-red-500">{outputData.error}</div>
-        ) : (
-          outputData?.image && (
-            <img src={`${outputData.image}`} alt="处理后图像" className="max-w-full" />
-          )
         )}
       </div>
+
+      {/* 输出端点 */}
       <Handle
         type="source"
         position={Position.Right}
-        style={{ background: '#555' }}
-        onConnect={(params) => console.log('handle onConnect', params)}
+        style={{ right: '-8px', background: '#555' }}
       />
     </div>
   );

@@ -117,7 +117,6 @@ async def process_image(request: ImageProcessRequest):
         
         # 根据类型处理图像
         print(f"开始处理图像: type={request.type}")
-        print(request)
         if request.type == "binary":
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             threshold = int(request.params.get("threshold", 128))
