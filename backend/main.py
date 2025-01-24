@@ -290,6 +290,7 @@ async def process_image(request: ImageProcessRequest):
                 img = img.astype(np.float32)
                 result = cv2.addWeighted(img, 1 - opacity, result, opacity, 0)
                 result = (result * 255).astype(np.uint8)
+                print('正片叠底处理完成')
                 
             elif request.type == "screen":
                 # 滤色
@@ -314,6 +315,7 @@ async def process_image(request: ImageProcessRequest):
                 img = img.astype(np.float32)
                 result = cv2.addWeighted(img, 1 - opacity, result, opacity, 0)
                 result = (result * 255).astype(np.uint8)
+                print('叠加处理完成')
                 
             elif request.type == "blend":
                 # 普通混合
@@ -322,6 +324,8 @@ async def process_image(request: ImageProcessRequest):
                 img = img.astype(np.float32)
                 img2 = img2.astype(np.float32)
                 result = cv2.addWeighted(img, 1 - ratio, img2, ratio, 0)
+                result = np.clip(result, 0, 255).astype(np.uint8)
+                print('普通混合处理完成')
             
         else:
             raise HTTPException(status_code=400, detail=f"不支持的处理类型: {request.type}")
