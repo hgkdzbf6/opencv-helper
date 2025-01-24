@@ -1,222 +1,143 @@
-declare namespace cv {
-  class Mat {
-    delete(): void;
-    copyTo(dst: Mat): void;
-  }
-  class Size {
-    constructor(width: number, height: number);
-  }
-  class Point {
-    constructor(x: number, y: number);
-  }
-  class Scalar {
-    constructor(r: number, g: number, b: number, a?: number);
-  }
-  
-  const THRESH_BINARY: number;
-  const THRESH_BINARY_INV: number;
-  const THRESH_TRUNC: number;
-  const THRESH_TOZERO: number;
-  const THRESH_TOZERO_INV: number;
-  const THRESH_OTSU: number;
-  
-  const BORDER_DEFAULT: number;
-  const BORDER_CONSTANT: number;
-  const BORDER_REPLICATE: number;
-  
-  const MORPH_RECT: number;
-  const MORPH_CROSS: number;
-  const MORPH_ELLIPSE: number;
-  
-  const LINE_4: number;
-  const LINE_8: number;
-  const LINE_AA: number;
-  
-  function threshold(src: Mat, dst: Mat, thresh: number, maxval: number, type: number): void;
-  function GaussianBlur(src: Mat, dst: Mat, ksize: Size, sigmaX: number, sigmaY: number, borderType?: number): void;
-  function getStructuringElement(shape: number, ksize: Size, anchor?: Point): Mat;
-  function erode(src: Mat, dst: Mat, kernel: Mat, anchor?: Point, iterations?: number): void;
-  function dilate(src: Mat, dst: Mat, kernel: Mat, anchor?: Point, iterations?: number): void;
-  function Canny(src: Mat, dst: Mat, threshold1: number, threshold2: number, apertureSize?: number, L2gradient?: boolean): void;
-  function bitwise_not(src: Mat, dst: Mat): void;
-  function addWeighted(src1: Mat, alpha: number, src2: Mat, beta: number, gamma: number, dst: Mat): void;
-  function rectangle(img: Mat, pt1: Point, pt2: Point, color: Scalar, thickness?: number, lineType?: number): void;
-  function circle(img: Mat, center: Point, radius: number, color: Scalar, thickness?: number, lineType?: number): void;
-  function line(img: Mat, pt1: Point, pt2: Point, color: Scalar, thickness?: number, lineType?: number): void;
-}
+// 定义参数类型
+export type ThresholdMethod = 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
+export type BorderType = 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
+export type KernelShape = 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
+export type LineType = 'LINE_4' | 'LINE_8' | 'LINE_AA';
+export type ContourMode = 'RETR_EXTERNAL' | 'RETR_LIST' | 'RETR_CCOMP' | 'RETR_TREE';
+export type ContourMethod = 'CHAIN_APPROX_NONE' | 'CHAIN_APPROX_SIMPLE' | 'CHAIN_APPROX_TC89_L1' | 'CHAIN_APPROX_TC89_KCOS';
 
-type Color = [number, number, number];
-
-interface ProcessParams {
+export interface ProcessParams {
+  // 二值化参数
   threshold?: number;
   maxValue?: number;
-  method?: 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
+  method?: ThresholdMethod;
   useOtsu?: boolean;
+
+  // 模糊参数
   kernelSize?: number;
   sigmaX?: number;
   sigmaY?: number;
-  borderType?: 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
+  borderType?: BorderType;
+
+  // 形态学操作参数
   iterations?: number;
-  kernelShape?: 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
+  kernelShape?: KernelShape;
   anchor?: { x: number; y: number };
+
+  // 边缘检测参数
   threshold1?: number;
   threshold2?: number;
-  apertureSize?: string;
+  apertureSize?: number;
   l2gradient?: boolean;
+
+  // 蒙版参数
   blendAlpha?: number;
+
+  // 绘图参数
   x?: number;
   y?: number;
   width?: number;
   height?: number;
   radius?: number;
-  color?: Color;
+  color?: [number, number, number];
   thickness?: number;
-  lineType?: 'LINE_4' | 'LINE_8' | 'LINE_AA';
+  lineType?: LineType;
   filled?: boolean;
   x1?: number;
   y1?: number;
   x2?: number;
   y2?: number;
+
+  // 空白图像参数
+  isGrayscale?: boolean;
+
+  // 轮廓检测参数
+  mode?: ContourMode;
+  contourMethod?: ContourMethod;
+  minArea?: number;
+  maxArea?: number;
+
+  // 混合模式参数
+  blendMode?: 'multiply' | 'screen' | 'overlay' | 'blend';
+  opacity?: number;
+  ratio?: number;
+  secondaryImage?: string;
+
+  // 允许任意其他参数
+  [key: string]: any;
 }
 
-export const processImage = (type: string, image: cv.Mat, params: ProcessParams): cv.Mat => {
-  const result = new cv.Mat();
+// API 基础 URL
+const API_BASE_URL = 'http://localhost:8000';
 
-  switch (type) {
-    case 'binary': {
-      const threshold = params.threshold ?? 128;
-      const maxValue = params.maxValue ?? 255;
-      const methodName = params.method ?? 'THRESH_BINARY';
-      const useOtsu = params.useOtsu ?? false;
-      cv.threshold(
-        image,
-        result,
-        threshold,
-        maxValue,
-        cv[methodName] + (useOtsu ? cv.THRESH_OTSU : 0)
-      );
-      break;
+// 处理图像的主函数
+export const processImage = async (type: string, imageData: string, params: ProcessParams = {}): Promise<string> => {
+  try {
+    console.log('开始处理图像，类型:', type);
+    console.log('处理参数:', params);
+
+    // 确保 imageData 是 base64 格式
+    const base64Image = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
+
+    const send_params = {
+      ...params,
+      // 确保数值类型参数为数字
+      threshold: params.threshold ? Number(params.threshold) : undefined,
+      kernelSize: params.kernelSize ? Number(params.kernelSize) : undefined,
+      iterations: params.iterations ? Number(params.iterations) : undefined,
+      threshold1: params.threshold1 ? Number(params.threshold1) : undefined,
+      threshold2: params.threshold2 ? Number(params.threshold2) : undefined,
+      x: params.x ? Number(params.x) : undefined,
+      y: params.y ? Number(params.y) : undefined,
+      width: params.width ? Number(params.width) : undefined,
+      height: params.height ? Number(params.height) : undefined,
+      radius: params.radius ? Number(params.radius) : undefined,
+      x1: params.x1 ? Number(params.x1) : undefined,
+      y1: params.y1 ? Number(params.y1) : undefined,
+      x2: params.x2 ? Number(params.x2) : undefined,
+      y2: params.y2 ? Number(params.y2) : undefined,
+      image2: params.image2 ? params.image2 : undefined,
     }
 
-    case 'blur': {
-      const kernelSize = params.kernelSize ?? 5;
-      const sigmaX = params.sigmaX ?? 0;
-      const sigmaY = params.sigmaY ?? 0;
-      const borderTypeName = params.borderType ?? 'BORDER_DEFAULT';
-      const ksize = new cv.Size(kernelSize, kernelSize);
-      cv.GaussianBlur(image, result, ksize, sigmaX, sigmaY, cv[borderTypeName]);
-      break;
-    }
-
-    case 'erode':
-    case 'dilate': {
-      const kernelSize = params.kernelSize ?? 3;
-      const iterations = params.iterations ?? 1;
-      const kernelShapeName = params.kernelShape ?? 'MORPH_RECT';
-      const anchor = params.anchor ?? { x: -1, y: -1 };
-      const kernel = cv.getStructuringElement(
-        cv[kernelShapeName],
-        new cv.Size(kernelSize, kernelSize)
-      );
-      if (type === 'erode') {
-        cv.erode(image, result, kernel, new cv.Point(anchor.x, anchor.y), iterations);
-      } else {
-        cv.dilate(image, result, kernel, new cv.Point(anchor.x, anchor.y), iterations);
+    for (const key in send_params) {
+      if (send_params[key as keyof typeof send_params] === undefined) {
+        delete send_params[key as keyof typeof send_params];
       }
-      kernel.delete();
-      break;
     }
 
-    case 'edge': {
-      const threshold1 = params.threshold1 ?? 100;
-      const threshold2 = params.threshold2 ?? 200;
-      const apertureSize = parseInt(params.apertureSize ?? '3', 10);
-      const l2gradient = params.l2gradient ?? false;
-      cv.Canny(image, result, threshold1, threshold2, apertureSize, l2gradient);
-      break;
+    // 构造请求数据
+    const requestData = {
+      type,
+      image: base64Image,
+      params: send_params,
+    };
+
+    console.log('发送请求数据:', requestData);
+
+    const response = await fetch(`${API_BASE_URL}/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: '图像处理失败' }));
+      console.error('服务器响应错误:', {
+        status: response.status,
+        statusText: response.statusText,
+        error,
+      });
+      throw new Error(error.detail || `服务器错误: ${response.status}`);
     }
 
-    case 'mask':
-    case 'invert-mask': {
-      const threshold = params.threshold ?? 128;
-      const maxValue = params.maxValue ?? 255;
-      const methodName = params.method ?? 'THRESH_BINARY';
-      const blendAlpha = params.blendAlpha ?? 0.5;
-      
-      const mask = new cv.Mat();
-      cv.threshold(image, mask, threshold, maxValue, cv[methodName]);
-      
-      if (type === 'invert-mask') {
-        cv.bitwise_not(mask, mask);
-      }
-      
-      cv.addWeighted(image, blendAlpha, mask, 1 - blendAlpha, 0, result);
-      mask.delete();
-      break;
-    }
-
-    case 'draw-rect': {
-      image.copyTo(result);
-      const x = params.x ?? 0;
-      const y = params.y ?? 0;
-      const width = params.width ?? 100;
-      const height = params.height ?? 100;
-      const color = params.color ?? [255, 0, 0] as Color;
-      const thickness = params.filled ? -1 : (params.thickness ?? 2);
-      const lineTypeName = params.lineType ?? 'LINE_8';
-      cv.rectangle(
-        result,
-        new cv.Point(x, y),
-        new cv.Point(x + width, y + height),
-        new cv.Scalar(...color),
-        thickness,
-        cv[lineTypeName]
-      );
-      break;
-    }
-
-    case 'draw-circle': {
-      image.copyTo(result);
-      const x = params.x ?? 50;
-      const y = params.y ?? 50;
-      const radius = params.radius ?? 25;
-      const color = params.color ?? [0, 255, 0] as Color;
-      const thickness = params.filled ? -1 : (params.thickness ?? 2);
-      const lineTypeName = params.lineType ?? 'LINE_8';
-      cv.circle(
-        result,
-        new cv.Point(x, y),
-        radius,
-        new cv.Scalar(...color),
-        thickness,
-        cv[lineTypeName]
-      );
-      break;
-    }
-
-    case 'draw-line': {
-      image.copyTo(result);
-      const x1 = params.x1 ?? 0;
-      const y1 = params.y1 ?? 0;
-      const x2 = params.x2 ?? 100;
-      const y2 = params.y2 ?? 100;
-      const color = params.color ?? [0, 0, 255] as Color;
-      const thickness = params.thickness ?? 2;
-      const lineTypeName = params.lineType ?? 'LINE_8';
-      cv.line(
-        result,
-        new cv.Point(x1, y1),
-        new cv.Point(x2, y2),
-        new cv.Scalar(...color),
-        thickness,
-        cv[lineTypeName]
-      );
-      break;
-    }
-
-    default:
-      image.copyTo(result);
+    const data = await response.json();
+    console.log('图像处理完成');
+    return data.result;
+  } catch (error) {
+    console.error('处理图像失败:', error);
+    throw error;
   }
-
-  return result;
-}; 
+};

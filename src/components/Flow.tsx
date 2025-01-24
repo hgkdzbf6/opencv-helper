@@ -14,6 +14,9 @@ import ReactFlow, {
   EdgeChange,
   MarkerType,
   Panel,
+  applyNodeChanges,
+  applyEdgeChanges,
+  NodeChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button, Upload, message, Modal, Radio, Space } from 'antd';
@@ -25,13 +28,24 @@ import PropertiesPanel from './PropertiesPanel';
 import NodeSelector from './NodeSelector';
 import DebugPanel from './DebugPanel';
 import ResizablePanel from './ResizablePanel';
-import { useImageStore } from '../store/imageStore';
+import { useDataStore } from '../store/imageStore';
 import { saveFlow, SaveOption, loadFlow } from '../utils/flowUtils';
 
-const nodeTypes: NodeTypes = {
-  input: InputNode,
-  output: OutputNode,
-  process: ProcessNode,
+const nodeTypes = {
+  'input': InputNode,
+  'process': ProcessNode,
+  'output': OutputNode,
+  'draw-rect': ProcessNode,
+  'draw-circle': ProcessNode,
+  'draw-line': ProcessNode,
+  'binary': ProcessNode,
+  'blur': ProcessNode,
+  'erode': ProcessNode,
+  'dilate': ProcessNode,
+  'edge': ProcessNode,
+  'mask': ProcessNode,
+  'invert-mask': ProcessNode,
+  'blank': InputNode
 };
 
 let id = 1; // 从1开始编号
@@ -55,108 +69,71 @@ const defaultEdgeOptions = {
   },
 };
 
+// 添加选择样式
+const edgeStyles = {
+  selected: {
+    stroke: '#2196f3',
+    strokeWidth: 3,
+  },
+};
+
+const nodeStyles = {
+  selected: {
+    borderColor: '#2196f3',
+    boxShadow: '0 0 0 2px #2196f3',
+  },
+};
+
 const Flow = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, _onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
-  const setStoreEdges = useImageStore((state) => state.setEdges);
-  const setImage = useImageStore((state) => state.setImage);
-  const setNodeParams = useImageStore((state) => state.setNodeParams);
+  const [logs, setLogs] = useState<string[]>([]);
+  const setStoreEdges = useDataStore((state) => state.setEdges);
+  const setData = useDataStore((state) => state.setData);
+  const setNodeParams = useDataStore((state) => state.setNodeParams);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [saveOption, setSaveOption] = useState<SaveOption>('all');
 
-  // 更新节点样式
-  const updateNodeStyles = useCallback((nodes: Node[], selectedId: string | null) => {
-    return nodes.map(node => ({
-      ...node,
-      className: node.id === selectedId ? 'border-2 border-blue-500' : '',
-    }));
-  }, []);
-
-  // 更新边的样式
-  const updateEdgeStyles = useCallback((edges: Edge[], selectedId: string | null) => {
-    return edges.map(edge => ({
-      ...edge,
-      style: {
-        ...defaultEdgeOptions.style,
-        stroke: edge.id === selectedId ? '#3b82f6' : '#374151',
-        strokeWidth: edge.id === selectedId ? 3 : 2,
-      },
-      markerEnd: {
-        ...defaultEdgeOptions.markerEnd,
-        color: edge.id === selectedId ? '#3b82f6' : '#374151',
-      },
-    }));
-  }, []);
-
-  const onConnect = useCallback(
-    (params: Connection | Edge) => {
-      // 检查连接规则
-      const sourceNode = nodes.find(node => node.id === params.source);
-      const targetNode = nodes.find(node => node.id === params.target);
-
-      if (!sourceNode || !targetNode) return;
-
-      // 输入节点不能有输入连接
-      if (targetNode.type === 'input') return;
-      // 输出节点不能有输出连接
-      if (sourceNode.type === 'output') return;
-      // 防止重复连接
-      if (edges.some(edge => 
-        edge.source === params.source && edge.target === params.target
-      )) return;
-      // 每个节点只能有一个输入连接
-      if (edges.some(edge => edge.target === params.target)) return;
-
-      const newEdges = addEdge(params, edges);
-      setEdges(newEdges);
-      // 立即更新 store 中的边
-      setStoreEdges(newEdges);
-
-      // 调试信息
-      console.group('新建连接');
-      console.log('源节点:', sourceNode);
-      console.log('目标节点:', targetNode);
-      console.log('新边:', newEdges);
-      console.groupEnd();
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      setNodes((nds) => applyNodeChanges(changes, nds));
+      const selectedChange = changes.find((change) => change.type === 'select');
+      if (selectedChange) {
+        const node = nodes.find((n) => n.id === selectedChange.id);
+        setSelectedNode(selectedChange.selected ? node || null : null);
+      }
     },
-    [edges, nodes, setEdges, setStoreEdges],
+    [nodes]
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      _onEdgesChange(changes);
-      // 在下一个事件循环中更新 store，确保边的状态已经更新
-      setTimeout(() => {
-        setStoreEdges(edges);
-        // 调试信息
-        console.group('边更新');
-        console.log('变更:', changes);
-        console.log('当前边:', edges);
-        console.groupEnd();
-      }, 0);
+      setEdges((eds) => applyEdgeChanges(changes, eds));
     },
-    [edges, _onEdgesChange, setStoreEdges],
+    []
   );
+
+  const onConnect = useCallback((connection: Connection) => {
+    const newEdges = addEdge(connection, edges);
+    setEdges(newEdges);
+    setStoreEdges(newEdges);
+  }, [edges, setStoreEdges]);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
-    setNodes(nodes => updateNodeStyles(nodes, node.id));
-  }, [updateNodeStyles]);
+  }, []);
 
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
     setSelectedEdge(edge);
-    setEdges(edges => updateEdgeStyles(edges, edge.id));
-  }, [updateEdgeStyles]);
+  }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
     setSelectedEdge(null);
-    setNodes(nodes => updateNodeStyles(nodes, null));
-    setEdges(edges => updateEdgeStyles(edges, null));
-  }, [updateNodeStyles, updateEdgeStyles]);
+  }, []);
 
   const onDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -183,29 +160,37 @@ const Flow = () => {
         id: nodeId,
         type: node.type,
         position,
-        data: node.type === 'process' 
-          ? { id: nodeId, type: node.processType, label: node.label }
-          : { id: nodeId },
+        data: {
+          id: nodeId,
+          label: node.label,
+          processType: node.processType,
+          type: node.type
+        }
       };
+
 
       setNodes((nds) => nds.concat(newNode));
     },
     [reactFlowInstance],
   );
 
-  const onNodeAdd = useCallback(
-    (type: string, position: { x: number; y: number }, data?: any) => {
-      const nodeId = getId();
-      const newNode = {
+  const onNodeAdd = useCallback((type: string, position: { x: number; y: number }, data?: any) => {
+    console.log('data', data);
+    const nodeId = getId();
+    const newNode = {
+      id: nodeId,
+      type: type,
+      position,
+      data: {
         id: nodeId,
-        type,
-        position,
-        data: data || { id: nodeId },
-      };
-      setNodes((nds) => nds.concat(newNode));
-    },
-    [],
-  );
+        label: data?.label || type,
+        type: data?.type,
+        processType: data?.processType
+      }
+    };
+    console.log('需要添加这样一个节点：', newNode);
+    setNodes((nds) => nds.concat(newNode));
+  }, [setNodes]);
 
   const showSaveModal = () => {
     if (nodes.length === 0) {
@@ -234,8 +219,8 @@ const Flow = () => {
       setStoreEdges(flowData.edges);
 
       // 恢复图片和参数
-      Object.entries(flowData.images).forEach(([nodeId, imageData]) => {
-        setImage(nodeId, imageData);
+      Object.entries(flowData.data_dict).forEach(([nodeId, data]) => {
+        setData(nodeId, data);
       });
       Object.entries(flowData.nodeParams).forEach(([nodeId, params]) => {
         setNodeParams(nodeId, params);
@@ -245,15 +230,24 @@ const Flow = () => {
     } catch (error) {
       message.error('加载失败: ' + (error as Error).message);
     }
-  }, [setNodes, setEdges, setStoreEdges, setImage, setNodeParams]);
+  }, [setNodes, setEdges, setStoreEdges, setData, setNodeParams]);
+
+  const addLog = useCallback((message: string) => {
+    setLogs((prevLogs) => [...prevLogs, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  }, []);
 
   return (
-    <div className="w-full h-full flex">
-      <ResizablePanel width={200} position="left">
+    <div className="w-screen h-screen flex">
+      <ResizablePanel
+        width={200}
+        minWidth={150}
+        maxWidth={300}
+        position="left"
+      >
         <NodeSelector onNodeAdd={onNodeAdd} />
       </ResizablePanel>
 
-      <div className="flex-1">
+      <div className="flex-1 h-full">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -268,6 +262,7 @@ const Flow = () => {
           onDrop={onDrop}
           nodeTypes={nodeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
+          className="[&_.selected]:!border-blue-500 [&_.selected]:!shadow-[0_0_0_2px_#3b82f6] [&_.selected]:!stroke-blue-500 [&_.selected]:!stroke-[3px]"
           fitView
         >
           <Controls />
@@ -299,13 +294,21 @@ const Flow = () => {
         </ReactFlow>
       </div>
 
-      <ResizablePanel width={300} position="right">
-        <PropertiesPanel 
-          selectedNode={selectedNode} 
+      <ResizablePanel
+        width={300}
+        minWidth={200}
+        maxWidth={500}
+        position="right"
+      >
+        <PropertiesPanel
+          selectedNode={selectedNode}
           nodes={nodes}
           edges={edges}
+          onNodeAdd={onNodeAdd}
         />
       </ResizablePanel>
+
+      <DebugPanel logs={logs} nodes={nodes} edges={edges} />
 
       <Modal
         title="保存选项"

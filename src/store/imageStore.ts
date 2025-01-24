@@ -5,18 +5,18 @@ export interface NodeParams {
   [key: string]: {
     threshold?: number;
     maxValue?: number;
-    method?: string;
+    method?: 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
     useOtsu?: boolean;
     kernelSize?: number;
     sigmaX?: number;
     sigmaY?: number;
-    borderType?: string;
+    borderType?: 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
     iterations?: number;
-    kernelShape?: string;
+    kernelShape?: 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
     anchor?: { x: number; y: number };
     threshold1?: number;
     threshold2?: number;
-    apertureSize?: string;
+    apertureSize?: number;
     l2gradient?: boolean;
     blendAlpha?: number;
     x?: number;
@@ -26,60 +26,92 @@ export interface NodeParams {
     radius?: number;
     color?: [number, number, number];
     thickness?: number;
-    lineType?: string;
+    lineType?: 'LINE_4' | 'LINE_8' | 'LINE_AA';
     filled?: boolean;
     x1?: number;
     y1?: number;
     x2?: number;
     y2?: number;
+    isGrayscale?: boolean;
+    mode?: string;
+    contourMethod?: string;
+    minArea?: number;
+    maxArea?: number;
   };
 }
 
-interface ImageState {
-  images: Record<string, string>;
+interface DataState {
+  data_dict: Record<string, { image?: string; [key: string]: any }>;
   edges: Edge[];
   showNodesPreview: boolean;
   nodeParams: Record<string, NodeParams>;
-  setImage: (nodeId: string, imageData: string) => void;
-  getImage: (nodeId: string) => string | undefined;
+  setData: (nodeId: string, data: { image?: string; [key: string]: any }) => void;
+  getData: (nodeId: string, ignorePreviewSetting?: boolean) => { image?: string; [key: string]: any } | undefined;
   setEdges: (edges: Edge[]) => void;
-  getConnectedNodeImage: (nodeId: string) => string | undefined;
+  getConnectedNodeSourceData: (nodeId: string, ignorePreviewSetting?: boolean) => { image?: string; [key: string]: any } | undefined;
+  getConnectedNodeSecondaryData: (nodeId: string, ignorePreviewSetting?: boolean) => { image?: string; [key: string]: any } | undefined;
   toggleNodesPreview: () => void;
   setNodeParams: (nodeId: string, params: NodeParams) => void;
   getNodeParams: (nodeId: string) => NodeParams | undefined;
 }
 
-export const useImageStore = create<ImageState>((set, get) => ({
-  images: {},
+export const useDataStore = create<DataState>((set, get) => ({
+  data_dict: {},
   edges: [],
   showNodesPreview: true,
   nodeParams: {},
 
-  setImage: (nodeId: string, imageData: string) => {
-    set((state) => ({
-      images: {
-        ...state.images,
-        [nodeId]: imageData,
-      },
-    }));
+  setData: (nodeId: string, data: string | { image?: string; [key: string]: any }) => {
+    if (typeof data === 'string') {
+      set((state) => ({
+        data_dict: {
+          ...state.data_dict,
+          [nodeId]: { image: data },
+        },
+      }));
+    } else {
+      set((state) => ({
+        data_dict: {
+          ...state.data_dict,
+          [nodeId]: data,
+        },
+      }));
+    }
   },
 
-  getImage: (nodeId: string) => {
-    return get().images[nodeId];
+  getData: (nodeId: string, ignorePreviewSetting = false) => {
+    const state = get();
+    return (ignorePreviewSetting || state.showNodesPreview) ? state.data_dict[nodeId] : undefined;
   },
 
   setEdges: (edges: Edge[]) => {
     set({ edges });
   },
 
-  getConnectedNodeImage: (nodeId: string) => {
+  getConnectedNodeSourceData: (nodeId: string, ignorePreviewSetting = false) => {
     const state = get();
-    const sourceNodeId = state.edges.find(edge => edge.target === nodeId)?.source;
-    return sourceNodeId ? state.images[sourceNodeId] : undefined;
+    if (!ignorePreviewSetting && !state.showNodesPreview) return undefined;
+    
+    const edges = state.edges;
+    const sourceEdge = edges.find(edge => edge.target === nodeId && edge.targetHandle !== 'secondary');
+    if (!sourceEdge) return undefined;
+    return state.data_dict[sourceEdge.source];
+  },
+
+  getConnectedNodeSecondaryData: (nodeId: string, ignorePreviewSetting = false) => {
+    const state = get();
+    if (!ignorePreviewSetting && !state.showNodesPreview) return undefined;
+    
+    const edges = state.edges;
+    const sourceEdge = edges.find(edge => edge.target === nodeId && edge.targetHandle === 'secondary');
+    if (!sourceEdge) return undefined;
+    return state.data_dict[sourceEdge.source];
   },
 
   toggleNodesPreview: () => {
-    set((state) => ({ showNodesPreview: !state.showNodesPreview }));
+    set((state) => ({ 
+      showNodesPreview: !state.showNodesPreview 
+    }));
   },
 
   setNodeParams: (nodeId: string, params: NodeParams) => {
