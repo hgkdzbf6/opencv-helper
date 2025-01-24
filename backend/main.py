@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import base64
 import json
+import traceback
 
 app = FastAPI()
 
@@ -384,8 +385,8 @@ async def process_image(request: ImageProcessRequest):
                 result = np.zeros_like(img)
                 result[mask] = 2 * img[mask] * img2[mask]
                 result[~mask] = 1 - 2 * (1 - img[~mask]) * (1 - img2[~mask])
-                
                 img = img.astype(np.float32)
+                result = result.astype(np.float32)
                 result = cv2.addWeighted(img, 1 - opacity, result, opacity, 0)
                 result = (result * 255).astype(np.uint8)
                 print('叠加处理完成')
@@ -418,6 +419,7 @@ async def process_image(request: ImageProcessRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         print(f"处理过程出错: {str(e)}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"图像处理失败: {str(e)}")
 
 if __name__ == "__main__":
