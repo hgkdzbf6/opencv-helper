@@ -59,28 +59,36 @@ export const processImage = async (type: string, imageData: string, params: Proc
     // 确保 imageData 是 base64 格式
     const base64Image = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
 
+    const send_params = {
+      ...params,
+      // 确保数值类型参数为数字
+      threshold: params.threshold ? Number(params.threshold) : undefined,
+      kernelSize: params.kernelSize ? Number(params.kernelSize) : undefined,
+      iterations: params.iterations ? Number(params.iterations) : undefined,
+      threshold1: params.threshold1 ? Number(params.threshold1) : undefined,
+      threshold2: params.threshold2 ? Number(params.threshold2) : undefined,
+      x: params.x ? Number(params.x) : undefined,
+      y: params.y ? Number(params.y) : undefined,
+      width: params.width ? Number(params.width) : undefined,
+      height: params.height ? Number(params.height) : undefined,
+      radius: params.radius ? Number(params.radius) : undefined,
+      x1: params.x1 ? Number(params.x1) : undefined,
+      y1: params.y1 ? Number(params.y1) : undefined,
+      x2: params.x2 ? Number(params.x2) : undefined,
+      y2: params.y2 ? Number(params.y2) : undefined,
+    }
+
+    for (const key in send_params) {
+      if (send_params[key as keyof typeof send_params] === undefined) {
+        delete send_params[key as keyof typeof send_params];
+      }
+    }
+
     // 构造请求数据
     const requestData = {
       type,
       image: base64Image,
-      params: {
-        ...params,
-        // 确保数值类型参数为数字
-        threshold: params.threshold ? Number(params.threshold) : undefined,
-        kernelSize: params.kernelSize ? Number(params.kernelSize) : undefined,
-        iterations: params.iterations ? Number(params.iterations) : undefined,
-        threshold1: params.threshold1 ? Number(params.threshold1) : undefined,
-        threshold2: params.threshold2 ? Number(params.threshold2) : undefined,
-        x: params.x ? Number(params.x) : undefined,
-        y: params.y ? Number(params.y) : undefined,
-        width: params.width ? Number(params.width) : undefined,
-        height: params.height ? Number(params.height) : undefined,
-        radius: params.radius ? Number(params.radius) : undefined,
-        x1: params.x1 ? Number(params.x1) : undefined,
-        y1: params.y1 ? Number(params.y1) : undefined,
-        x2: params.x2 ? Number(params.x2) : undefined,
-        y2: params.y2 ? Number(params.y2) : undefined,
-      },
+      params: send_params,
     };
 
     console.log('发送请求数据:', requestData);

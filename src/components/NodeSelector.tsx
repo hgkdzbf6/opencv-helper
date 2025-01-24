@@ -88,6 +88,7 @@ const NodeSelector = ({ onNodeAdd }: NodeSelectorProps) => {
     };
     event.dataTransfer.setData('application/reactflow', JSON.stringify(data));
     event.dataTransfer.effectAllowed = 'move';
+    console.log('拖拽的节点是：', node);
   };
 
   const onNodeClick = (node: NodeType) => {

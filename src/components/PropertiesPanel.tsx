@@ -307,7 +307,6 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
   );
 
   const content = (() => {
-    console.log('Rendering controls for type:', type); // 添加日志
     switch (type) {
       case 'blur':
         return (
@@ -448,7 +447,7 @@ const CodeGeneratorPanel = ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) 
 
 const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPanelProps) => {
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [drawingImage, setDrawingImage] = useState<string | undefined>(undefined);
+  const [inputOrOutput, setInputOrOutput] = useState<string | undefined>(undefined);
   const setImage = useImageStore((state) => state.setImage);
   const getImage = useImageStore((state) => state.getImage);
   const getConnectedImage = useImageStore((state) => state.getConnectedNodeSourceImage);
@@ -462,13 +461,11 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
 
   const inputImage = useMemo(() => {
     if (!selectedNode) return undefined;
-    console.log('节点id为',selectedNode.id,'的inputImage 是什么：', getConnectedImage(selectedNode.id, true));
     return getConnectedImage(selectedNode.id, true);
   }, [selectedNode, getConnectedImage]);
 
   const outputImage = useMemo(() => {
     if (!selectedNode) return undefined;
-    console.log('节点id为',selectedNode.id,'的outputImage 是什么：', getConnectedImage(selectedNode.id, false));
     return getImage(selectedNode.id, false);
   }, [selectedNode, getImage]);
 
@@ -478,9 +475,9 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
   }, [nodes, selectedNode]);
 
   const backgroundImage = useMemo(() => {
-    if (!selectedBackgroundNode) return inputImage;
+    if (!selectedBackgroundNode) return undefined;
     return useImageStore.getState().getImage(selectedBackgroundNode, true);
-  }, [selectedBackgroundNode, inputImage]);
+  }, [selectedBackgroundNode]);
 
   const handleDrawComplete = useCallback((params: DrawingParams) => {
     if (selectedNode?.type === 'process' && 
@@ -513,13 +510,13 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
     setIsDrawingMode(false);
   }, [selectedNode, nodeParams, setNodeParams]);
 
-  const handlePreviewClick = useCallback((image: string) => {
+  const handlePreviewClick = useCallback((inputOrOutput: string) => {
     if (selectedNode?.type === 'process' && 
         (selectedNode.data.processType === 'draw-rect' || selectedNode.data.processType === 'draw-circle' || selectedNode.data.processType === 'draw-line')) {
       setIsDrawingMode(true);
     }
     setPreviewVisible(true);
-    setDrawingImage(image);
+    setInputOrOutput(inputOrOutput);
   }, [selectedNode]);
 
   const handleToolChange = (value: string) => {
@@ -529,7 +526,7 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
 
   if (!selectedNode) {
     return (
-      <div className="w-[300px] bg-white border-l border-gray-200 p-4">
+      <div className="w-[300px] bg-white border-l border-gray-200 p-4 h-screen overflow-y-auto">
         <div className="text-gray-400 text-center mt-8">
           <div className="text-xl mb-2">👈 请选择一个节点</div>
           <div className="text-sm">点击左侧节点查看详情</div>
@@ -559,7 +556,7 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
   };
 
   return (
-    <div className="w-[300px] bg-white border-l border-gray-200 p-4">
+    <div className="w-[300px] bg-white border-l border-gray-200 p-4 h-screen overflow-y-auto">
       <div className="mb-4">
         <div className="text-xl font-bold">{getNodeTitle()}</div>
         <div className="text-sm text-gray-500">
@@ -577,13 +574,13 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
       <Card title="输入图片预览" className="mb-4" size="small">
         <div 
           className="w-full bg-gray-50 rounded flex items-center justify-center overflow-hidden"
-          onClick={inputImage ? handlePreviewClick : undefined}
+          onClick={inputImage ? () => handlePreviewClick("input") : undefined}
           style={{ cursor: inputImage ? 'pointer' : 'default' }}
         >
           {inputImage ? (
             <img 
               src={inputImage} 
-              alt="预览" 
+              alt="输入图像预览" 
               className="max-w-full max-h-full object-contain"
             />
           ) : (
@@ -600,13 +597,15 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
       <Card title="输出图片预览" className="mb-4" size="small">
         <div 
           className="w-full bg-gray-50 rounded flex items-center justify-center overflow-hidden"
-          onClick={outputImage ? handlePreviewClick : undefined}
+          onClick={outputImage ? () => {
+            handlePreviewClick("output");
+          } : undefined}
           style={{ cursor: outputImage ? 'pointer' : 'default' }}
         >
           {outputImage ? (
             <img 
               src={outputImage} 
-              alt="预览" 
+              alt="输出图像预览" 
               className="max-w-full max-h-full object-contain"
             />
           ) : (
@@ -684,7 +683,7 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
               setPreviewVisible(false);
               setIsDrawingMode(false);
             }}>
-              关闭
+              关闭预览
             </Button>
           </div>
         }
@@ -697,18 +696,18 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
         styles={{ body: { padding: 0 } }}
       >
         <div className="w-full h-[80vh] bg-gray-50 flex items-center justify-center">
-          {(backgroundImage || drawingImage) && (
+          {(backgroundImage || inputOrOutput === "output" || inputOrOutput === "input") && (
             isDrawingMode ? (
               <DrawingCanvas 
                 visible={isDrawingMode}
                 onClose={() => setIsDrawingMode(false)}
                 onComplete={handleDrawComplete}
                 type={drawingTool}
-                initialImage={backgroundImage || drawingImage}
+                initialImage={backgroundImage || (inputOrOutput === "output" ? outputImage : inputOrOutput === "input" ? inputImage : undefined)}
               />
             ) : (
               <img 
-                src={backgroundImage || drawingImage} 
+                src={backgroundImage || (inputOrOutput === "output" ? outputImage : inputOrOutput === "input" ? inputImage : undefined)} 
                 alt="大图预览" 
                 className="max-w-full max-h-full object-contain"
               />

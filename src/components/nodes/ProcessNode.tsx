@@ -119,8 +119,8 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
     }
 
     try {
-      console.log(`[ProcessNode ${data.id}] 开始处理图像，类型: ${data.type}`);
-      const params = nodeParams[data.type] || {};
+      console.log(`[ProcessNode ${data.id}] 开始处理图像，类型: ${data.type}，具体类型: ${data.processType}`);
+      const params = nodeParams[data.processType] || {};
       console.log(`[ProcessNode ${data.id}] 处理参数:`, JSON.stringify(params, null, 2));
       
       const processed = await processImage(data.processType, inputImage, params);

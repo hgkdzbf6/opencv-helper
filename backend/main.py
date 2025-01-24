@@ -27,7 +27,7 @@ LineType = Literal['LINE_4', 'LINE_8', 'LINE_AA']
 class ImageProcessRequest(BaseModel):
     type: str
     image: str
-    params: Dict[str, Union[int, float, str, List[int], bool, None]] = {}
+    params: Dict[str, Union[int, float, str, List[int], bool, Dict[str, int], None]] = {}
 
 def base64_to_cv2(base64_str: str) -> np.ndarray:
     """将 base64 图像转换为 OpenCV 格式"""
