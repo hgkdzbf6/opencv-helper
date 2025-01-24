@@ -1,10 +1,12 @@
 // 定义参数类型
-type ThresholdMethod = 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
-type BorderType = 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
-type KernelShape = 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
-type LineType = 'LINE_4' | 'LINE_8' | 'LINE_AA';
+export type ThresholdMethod = 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 'THRESH_TOZERO' | 'THRESH_TOZERO_INV';
+export type BorderType = 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
+export type KernelShape = 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
+export type LineType = 'LINE_4' | 'LINE_8' | 'LINE_AA';
+export type ContourMode = 'RETR_EXTERNAL' | 'RETR_LIST' | 'RETR_CCOMP' | 'RETR_TREE';
+export type ContourMethod = 'CHAIN_APPROX_NONE' | 'CHAIN_APPROX_SIMPLE' | 'CHAIN_APPROX_TC89_L1' | 'CHAIN_APPROX_TC89_KCOS';
 
-interface ProcessParams {
+export interface ProcessParams {
   // 二值化参数
   threshold?: number;
   maxValue?: number;
@@ -45,6 +47,23 @@ interface ProcessParams {
   y1?: number;
   x2?: number;
   y2?: number;
+
+  // 空白图像参数
+  isGrayscale?: boolean;
+
+  // 轮廓检测参数
+  mode?: ContourMode;
+  contourMethod?: ContourMethod;
+  minArea?: number;
+  maxArea?: number;
+
+  // 混合模式参数
+  blendMode?: 'multiply' | 'screen' | 'overlay' | 'blend';
+  opacity?: number;
+  ratio?: number;
+
+  // 允许任意其他参数
+  [key: string]: any;
 }
 
 // API 基础 URL

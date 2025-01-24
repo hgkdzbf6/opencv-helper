@@ -5,6 +5,7 @@ from typing import Dict, Optional, List, Union, Tuple, Literal
 import cv2
 import numpy as np
 import base64
+import json
 
 app = FastAPI()
 
@@ -138,7 +139,80 @@ async def process_image(request: ImageProcessRequest):
                 
             print(f"二值化处理: threshold={threshold}, max_value={max_value}, method={method}, use_otsu={use_otsu}")
             _, result = cv2.threshold(gray, threshold, max_value, thresh_method)
+        
+        elif request.type == "grayscale":
+            result = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            print('灰度处理完成')
+
+        elif request.type == "contour":
+            # 转换为灰度图
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             
+            # 二值化
+            _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+            
+            # 获取参数
+            mode = request.params.get("mode", "RETR_EXTERNAL")
+            method = request.params.get("contourMethod", "CHAIN_APPROX_SIMPLE")
+            min_area = float(request.params.get("minArea", 100))
+            max_area = float(request.params.get("maxArea", 10000))
+            
+            # 转换模式
+            mode_map = {
+                "RETR_EXTERNAL": cv2.RETR_EXTERNAL,
+                "RETR_LIST": cv2.RETR_LIST,
+                "RETR_CCOMP": cv2.RETR_CCOMP,
+                "RETR_TREE": cv2.RETR_TREE
+            }
+            
+            # 转换方法
+            method_map = {
+                "CHAIN_APPROX_NONE": cv2.CHAIN_APPROX_NONE,
+                "CHAIN_APPROX_SIMPLE": cv2.CHAIN_APPROX_SIMPLE,
+                "CHAIN_APPROX_TC89_L1": cv2.CHAIN_APPROX_TC89_L1,
+                "CHAIN_APPROX_TC89_KCOS": cv2.CHAIN_APPROX_TC89_KCOS
+            }
+            
+            # 查找轮廓
+            contours, hierarchy = cv2.findContours(
+                binary,
+                mode_map.get(mode, cv2.RETR_EXTERNAL),
+                method_map.get(method, cv2.CHAIN_APPROX_SIMPLE)
+            )
+            
+            # 过滤轮廓
+            filtered_contours = []
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                if min_area <= area <= max_area:
+                    filtered_contours.append(contour)
+            
+            # 绘制轮廓
+            result = np.zeros_like(img)
+            cv2.drawContours(result, filtered_contours, -1, (0, 255, 0), 2)
+            
+            # 将轮廓点转换为列表并返回
+            contours_data = []
+            for contour in filtered_contours:
+                contour_points = contour.reshape(-1, 2).tolist()
+                contours_data.append({
+                    'points': contour_points,
+                    'area': cv2.contourArea(contour),
+                    'perimeter': cv2.arcLength(contour, True)
+                })
+            
+            # 将轮廓数据编码为 JSON 字符串
+            result_data = {
+                'image': cv2_to_base64(result),
+                'contours_count': len(contours_data),
+                'contours': contours_data
+            }
+            return {'result': json.dumps(result_data)}
+
+        elif request.type == "blank":
+            result = np.zeros_like(img)
+            print('空白处理完成')
+
         elif request.type == "blur":
             kernel_size = int(request.params.get("kernelSize", 5))
             sigma_x = float(request.params.get("sigmaX", 0))

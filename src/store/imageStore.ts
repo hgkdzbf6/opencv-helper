@@ -36,15 +36,15 @@ export interface NodeParams {
 }
 
 interface ImageState {
-  images: Record<string, string>;
+  images: Record<string, { image?: string; [key: string]: any }>;
   edges: Edge[];
   showNodesPreview: boolean;
   nodeParams: Record<string, NodeParams>;
-  setImage: (nodeId: string, imageData: string) => void;
-  getImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
+  setImage: (nodeId: string, data: { image?: string; [key: string]: any }) => void;
+  getImage: (nodeId: string, ignorePreviewSetting?: boolean) => { image?: string; [key: string]: any } | undefined;
   setEdges: (edges: Edge[]) => void;
-  getConnectedNodeSourceImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
-  getConnectedNodeSecondaryImage: (nodeId: string, ignorePreviewSetting?: boolean) => string | undefined;
+  getConnectedNodeSourceImage: (nodeId: string, ignorePreviewSetting?: boolean) => { image?: string; [key: string]: any } | undefined;
+  getConnectedNodeSecondaryImage: (nodeId: string, ignorePreviewSetting?: boolean) => { image?: string; [key: string]: any } | undefined;
   toggleNodesPreview: () => void;
   setNodeParams: (nodeId: string, params: NodeParams) => void;
   getNodeParams: (nodeId: string) => NodeParams | undefined;
@@ -56,11 +56,11 @@ export const useImageStore = create<ImageState>((set, get) => ({
   showNodesPreview: true,
   nodeParams: {},
 
-  setImage: (nodeId: string, imageData: string) => {
+  setImage: (nodeId: string, data: { image?: string; [key: string]: any }) => {
     set((state) => ({
       images: {
         ...state.images,
-        [nodeId]: imageData,
+        [nodeId]: data,
       },
     }));
   },
@@ -92,11 +92,6 @@ export const useImageStore = create<ImageState>((set, get) => ({
     const sourceEdge = edges.find(edge => edge.target === nodeId && edge.targetHandle === 'secondary');
     if (!sourceEdge) return undefined;
     return state.images[sourceEdge.source];
-  },
-
-  getConnectedNodeTargetImage: (nodeId: string) => {
-    const state = get();
-    return state.images[nodeId];
   },
 
   toggleNodesPreview: () => {

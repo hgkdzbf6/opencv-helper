@@ -17,6 +17,8 @@ type ThresholdMethod = 'THRESH_BINARY' | 'THRESH_BINARY_INV' | 'THRESH_TRUNC' | 
 type BorderType = 'BORDER_DEFAULT' | 'BORDER_CONSTANT' | 'BORDER_REPLICATE';
 type KernelShape = 'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE';
 type LineType = 'LINE_4' | 'LINE_8' | 'LINE_AA';
+type ContourMode = 'RETR_EXTERNAL' | 'RETR_LIST' | 'RETR_CCOMP' | 'RETR_TREE';
+type ContourMethod = 'CHAIN_APPROX_NONE' | 'CHAIN_APPROX_SIMPLE' | 'CHAIN_APPROX_TC89_L1' | 'CHAIN_APPROX_TC89_KCOS';
 
 interface NodeTypeParams {
   threshold?: number;
@@ -50,6 +52,11 @@ interface NodeTypeParams {
   filled?: boolean;
   opacity?: number;
   ratio?: number;
+  isGrayscale?: boolean;
+  mode?: ContourMode;
+  contourMethod?: ContourMethod;
+  minArea?: number;
+  maxArea?: number;
 }
 
 interface NodeParams {
@@ -308,6 +315,19 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
     </div>
   );
 
+  const renderNumberInput = (label: string, key: ParamKey, min: number, max: number, defaultValue: number) => (
+    <div className="mb-4">
+      <div className="mb-2">{label}</div>
+      <InputNumber
+        min={min}
+        max={max}
+        value={(currentParams[key] as number) ?? defaultValue}
+        onChange={(value) => onParamChange(key, value)}
+        style={{ width: '100%' }}
+      />
+    </div>
+  );
+
   const content = (() => {
     switch (type) {
       case 'blur':
@@ -410,6 +430,66 @@ const ProcessControls = ({ nodeId, type }: { nodeId: string; type: string }) => 
           </div>
         );
 
+      case 'grayscale':
+        return (
+          <div>
+            <div className="text-sm text-gray-500 mb-4">
+              将彩色图像转换为灰度图像，不需要额外参数。
+            </div>
+          </div>
+        );
+
+      case 'blank':
+        return (
+          <div>
+            <div className="text-sm text-gray-500 mb-4">
+              创建纯色图像，可以选择输出彩色或灰度图像。
+            </div>
+            {renderNumberInput('宽度', 'width', 1, 4096, 512)}
+            {renderNumberInput('高度', 'height', 1, 4096, 512)}
+            {renderColorPicker('颜色', 'color', [255, 255, 255])}
+            {renderSwitch('输出灰度图', 'isGrayscale', false)}
+          </div>
+        );
+
+      case 'contour':
+        return (
+          <div>
+            <div className="text-sm text-gray-500 mb-4">
+              检测图像中的轮廓，输出轮廓点列表。
+            </div>
+            {renderSelect('检测模式', 'mode', [
+              { value: 'RETR_EXTERNAL', label: '只检测外轮廓' },
+              { value: 'RETR_LIST', label: '检测所有轮廓' },
+              { value: 'RETR_CCOMP', label: '检测所有轮廓并建立两层结构' },
+              { value: 'RETR_TREE', label: '检测所有轮廓并重建层次结构' }
+            ], 'RETR_EXTERNAL')}
+            {renderSelect('轮廓近似方法', 'contourMethod', [
+              { value: 'CHAIN_APPROX_NONE', label: '保存所有轮廓点' },
+              { value: 'CHAIN_APPROX_SIMPLE', label: '压缩水平、垂直和对角线段' },
+              { value: 'CHAIN_APPROX_TC89_L1', label: 'Teh-Chin链逼近算法' },
+              { value: 'CHAIN_APPROX_TC89_KCOS', label: 'Teh-Chin链逼近算法' }
+            ], 'CHAIN_APPROX_SIMPLE')}
+            {renderNumberInput('最小面积', 'minArea', 0, 100000, 100)}
+            {renderNumberInput('最大面积', 'maxArea', 0, 100000, 10000)}
+          </div>
+        );
+
+      case 'print':
+        const inputData = useImageStore.getState().getConnectedNodeSourceImage(nodeId, true);
+        return (
+          <div>
+            <div className="text-sm text-gray-500 mb-4">
+              打印输入数据。
+            </div>
+            <div className="bg-gray-50 p-4 rounded">
+              <pre className="whitespace-pre-wrap text-sm">
+                {inputData ? JSON.stringify(JSON.parse(inputData), null, 2) : '暂无数据'}
+              </pre>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -465,7 +545,7 @@ const CodeGeneratorPanel = ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) 
 
 const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPanelProps) => {
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [inputOrOutput, setInputOrOutput] = useState<string | undefined>(undefined);
+  const [inputOrOutput, setInputOrOutput] = useState<string | object | undefined>(undefined);
   const setImage = useImageStore((state) => state.setImage);
   const getImage = useImageStore((state) => state.getImage);
   const getConnectedImage = useImageStore((state) => state.getConnectedNodeSourceImage);
@@ -479,7 +559,14 @@ const PropertiesPanel = ({ selectedNode, nodes, edges, onNodeAdd }: PropertiesPa
 
   const inputImage = useMemo(() => {
     if (!selectedNode) return undefined;
-    return getConnectedImage(selectedNode.id, true);
+    const img = getConnectedImage(selectedNode.id, true);
+    if (img && typeof img === 'object' && 'image' in img) {
+      return img.image;
+    }
+    if (img && typeof img === 'string') {
+      return img;
+    }
+    return undefined;
   }, [selectedNode, getConnectedImage]);
 
   const outputImage = useMemo(() => {

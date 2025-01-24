@@ -1,16 +1,17 @@
+import React, { useEffect, useCallback } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useImageStore } from '../../store/imageStore';
-import { useEffect, useCallback } from 'react';
-import { processImage } from '../../utils/imageProcessing';
+import { processImage, ProcessParams, ContourMode, ContourMethod } from '../../utils/imageProcessing';
+
+interface ProcessNodeData {
+  id: string;
+  label: string;
+  type: 'process' | 'input' | 'output';
+  processType: 'binary' | 'blur' | 'erode' | 'dilate' | 'edge' | 'mask' | 'invert-mask' | 'draw-rect' | 'draw-circle' | 'draw-line' | 'multiply' | 'screen' | 'overlay' | 'blend' | 'grayscale' | 'blank' | 'contour' | 'print';
+}
 
 interface ProcessNodeProps {
-  id: string;
-  data: {
-    id: string;
-    type: 'process' | 'input' | 'output';
-    processType: 'binary' | 'blur' | 'erode' | 'dilate' | 'edge' | 'mask' | 'invert-mask' | 'draw-rect' | 'draw-circle' | 'draw-line' | 'multiply' | 'screen' | 'overlay' | 'blend';
-    label: string;
-  };
+  data: ProcessNodeData;
   className?: string;
 }
 
@@ -61,6 +62,15 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
           threshold2: 200,
           apertureSize: 3,
           l2gradient: false
+        },
+        'grayscale': {
+          // 灰度图不需要额外参数
+        },
+        'blank': {
+          width: 512,
+          height: 512,
+          color: [255, 255, 255] as [number, number, number],
+          isGrayscale: false
         },
         'mask': {
           threshold: 128,
@@ -113,6 +123,15 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
         },
         'blend': {
           ratio: 0.5
+        },
+        'contour': {
+          mode: 'RETR_EXTERNAL',
+          contourMethod: 'CHAIN_APPROX_SIMPLE',
+          minArea: 100,
+          maxArea: 10000
+        },
+        'print': {
+          // 打印节点不需要参数
         }
       }[data.processType];
       
@@ -122,51 +141,63 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
     }
   }, [data.id, data.type, data.processType, nodeParams, setNodeParams]);
 
-  // 使用 useCallback 缓存处理函数
-  const processAndUpdateImage = useCallback(async () => {
-    console.log(`[ProcessNode ${data.id}] 检查处理条件`);
-    console.log(`- 输入图像: ${inputImage ? '有' : '无'}`);
-    if (isBlendNode) {
-      console.log(`- 第二输入图像: ${secondaryImage ? '有' : '无'}`);
-    }
-    console.log(`- 节点参数: ${nodeParams ? '有' : '无'}`);
-    console.log(`- 节点类型: ${data.type}`);
-    
-    if (!inputImage || (isBlendNode && !secondaryImage) || !nodeParams) {
-      console.log(`[ProcessNode ${data.id}] 跳过处理：缺少必要输入`);
-      setImage(data.id, '');
-      return;
-    }
-
-    try {
-      console.log(`[ProcessNode ${data.id}] 开始处理图像，类型: ${data.type}，具体类型: ${data.processType}`);
-      const params = {
-        ...nodeParams[data.processType],
-        ...(isBlendNode ? { secondaryImage } : {})
-      };
-      console.log(`[ProcessNode ${data.id}] 处理参数:`, JSON.stringify(params, null, 2));
-      
-      const processed = await processImage(data.processType, inputImage, params);
-      console.log(`[ProcessNode ${data.id}] 图像处理完成，更新输出`);
-      setImage(data.id, processed);
-    } catch (error) {
-      console.error(`[ProcessNode ${data.id}] 处理错误:`, error);
-      setImage(data.id, '');
-    }
-  }, [data.id, data.type, data.processType, inputImage, secondaryImage, nodeParams, setImage, isBlendNode]);
-
-  // 当输入图像或参数改变时处理图像
   useEffect(() => {
-    console.log(`[ProcessNode ${data.id}] 检测到变化`);
-    console.log('data', data);
-    console.log(`- 输入图像: ${inputImage ? '有' : '无'}`);
-    console.log(`- 节点参数: ${nodeParams ? '有' : '无'}`);
-    
-    if (!inputImage) {
-      console.log(`[ProcessNode ${data.id}] 无输入图像，清除输出`);
-      setImage(data.id, '');
-      return;
-    }
+    if (!inputImage) return;
+
+    const processParams = nodeParams?.[data.processType] || {};
+    let outputImg: { image?: string; [key: string]: any } = {};
+
+    const processAndUpdateImage = async () => {
+      try {
+        switch (data.processType) {
+          case 'grayscale':
+            const grayResult = await processImage('grayscale', inputImage.image || '', {});
+            outputImg = { image: grayResult };
+            break;
+
+          case 'blank': {
+            const blankParams: ProcessParams = {
+              width: processParams.width || 512,
+              height: processParams.height || 512,
+              color: processParams.color || [255, 255, 255],
+              isGrayscale: processParams.isGrayscale || false
+            };
+            const blankResult = await processImage('blank', inputImage.image || '', blankParams);
+            outputImg = { image: blankResult };
+            break;
+          }
+
+          case 'contour': {
+            const contourParams: ProcessParams = {
+              mode: processParams.mode || 'RETR_EXTERNAL',
+              contourMethod: processParams.contourMethod || 'CHAIN_APPROX_SIMPLE',
+              minArea: processParams.minArea || 100,
+              maxArea: processParams.maxArea || 10000
+            };
+            const contourResult = await processImage('contour', inputImage.image || '', contourParams);
+            // contourResult 是一个 JSON 字符串，包含图像和轮廓数据
+            const contourData = JSON.parse(contourResult);
+            outputImg = contourData;
+            break;
+          }
+
+          case 'print':
+            // 打印节点直接传递输入数据
+            outputImg = inputImage;
+            break;
+
+          default:
+            const result = await processImage(data.processType, inputImage.image || '', processParams);
+            outputImg = { image: result };
+        }
+
+        console.log(`[ProcessNode ${data.id}] 图像处理完成，更新输出`);
+        setImage(data.id, outputImg);
+      } catch (error) {
+        console.error(`[ProcessNode ${data.id}] 处理错误:`, error);
+        setImage(data.id, {});
+      }
+    };
 
     const timer = setTimeout(() => {
       console.log(`[Timer ProcessNode ${data.id}] 开始延迟处理`);
@@ -177,34 +208,47 @@ const ProcessNode = ({ data, className }: ProcessNodeProps) => {
       console.log(`[ProcessNode ${data.id}] 清理定时器`);
       clearTimeout(timer);
     };
-  }, [data.id, inputImage, nodeParams, processAndUpdateImage, setImage]);
+  }, [data.id, data.processType, inputImage, nodeParams, setImage]);
 
   return (
-    <div className={`px-4 py-2 rounded border border-gray-200 bg-white font-medium shadow-sm ${className || ''}`}>
-      <Handle type="target" position={Position.Left} />
-      {isBlendNode && (
-        <Handle 
-          type="target" 
-          position={Position.Top} 
-          id="secondary"
-          style={{ top: 0 }}
-        />
-      )}
-      <div className="flex flex-col items-center">
-        <div className="mb-2">{data.label}</div>
-        {showNodesPreview && outputImage && (
-          <div className="w-[100px] h-[100px] bg-gray-50 rounded overflow-hidden">
-            <img 
-              src={outputImage} 
-              alt="处理后" 
-              className="w-full h-full object-contain"
-            />
+    <div className="relative">
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ background: '#555' }}
+        onConnect={(params) => console.log('handle onConnect', params)}
+      />
+      <div className="p-2">
+        <div className="text-sm font-medium mb-2">{data.label}</div>
+        {data.processType === 'print' && inputImage ? (
+          <div className="text-xs whitespace-pre-wrap overflow-auto max-h-[200px]">
+            {typeof inputImage === 'object' ? (
+              <>
+                {inputImage.image && (
+                  <div className="mb-2">
+                    <img src={`data:image/png;base64,${inputImage.image}`} alt="输入图像" className="max-w-full" />
+                  </div>
+                )}
+                <pre>{JSON.stringify(inputImage, null, 2)}</pre>
+              </>
+            ) : (
+              inputImage
+            )}
           </div>
+        ) : (
+          outputImage?.image && (
+            <img src={`data:image/png;base64,${outputImage.image}`} alt="处理后图像" className="max-w-full" />
+          )
         )}
       </div>
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ background: '#555' }}
+        onConnect={(params) => console.log('handle onConnect', params)}
+      />
     </div>
   );
 };
 
-export default ProcessNode; 
+export default ProcessNode;

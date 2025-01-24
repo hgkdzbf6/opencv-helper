@@ -44,11 +44,14 @@ const nodeCategories: Record<string, NodeCategory> = {
   basic_process: {
     title: '基础处理',
     nodes: [
+      { type: 'process', processType: 'grayscale', label: '🌫 灰度图', description: '将彩色图像转换为灰度图' },
+      { type: 'process', processType: 'blank', label: '⬜️ 空白图像', description: '创建纯色图像，可选择彩色或黑白' },
       { type: 'process', processType: 'binary', label: '⚫️ 二值化', description: '将图像转换为黑白二值图像' },
       { type: 'process', processType: 'blur', label: '🌫 模糊', description: '对图像进行高斯模糊' },
       { type: 'process', processType: 'erode', label: '🔍 腐蚀', description: '图像腐蚀操作' },
       { type: 'process', processType: 'dilate', label: '💫 膨胀', description: '图像膨胀操作' },
-      { type: 'process', processType: 'edge', label: '🔲 边缘检测', description: '检测图像边缘' }
+      { type: 'process', processType: 'edge', label: '🔲 边缘检测', description: '检测图像边缘' },
+      { type: 'process', processType: 'contour', label: '📍 轮廓检测', description: '检测图像中的轮廓' }
     ]
   },
   draw: {
@@ -78,7 +81,8 @@ const nodeCategories: Record<string, NodeCategory> = {
   output: {
     title: '输出节点',
     nodes: [
-      { type: 'output', label: '📤 图像输出', description: '输出处理后的图像' }
+      { type: 'output', label: '📤 图像输出', description: '输出处理后的图像' },
+      { type: 'process', processType: 'print', label: '📝 数据打印', description: '打印非图像数据' }
     ]
   }
 };
